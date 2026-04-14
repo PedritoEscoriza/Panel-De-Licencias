@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Panel de Licencias</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap');
+  :root {
+    --bg: #0f0f0f; --surface: #181818; --surface2: #222222; --border: #2a2a2a;
+    --green: #00e676; --green-dim: #00e67622; --amber: #ffab00; --amber-dim: #ffab0022;
+    --red: #ff5252; --red-dim: #ff525222; --wa: #25d366; --wa-dim: #25d36622;
+    --text: #f0f0f0; --text-muted: #888; --radius: 10px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-serif; min-height: 100vh; padding: 2rem; }
+  header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 2rem; padding-bottom: 1.5rem; border-bottom: 1px solid var(--border); }
+  h1 { font-size: 1.4rem; font-weight: 500; letter-spacing: -0.02em; }
+  h1 span { color: var(--green); font-family: 'DM Mono', monospace; }
+  .header-actions { display: flex; gap: 10px; align-items: center; }
+  .btn { padding: 8px 16px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 13px; cursor: pointer; transition: all 0.15s; }
+  .btn:hover { background: var(--surface2); border-color: #444; }
+  .btn-primary { background: var(--green); color: #000; border-color: var(--green); font-weight: 600; }
+  .btn-primary:hover { background: #00ff88; border-color: #00ff88; }
+  .btn-wa { background: var(--wa); color: #000; border-color: var(--wa); font-weight: 600; }
+  .btn-wa:hover { background: #2fea72; border-color: #2fea72; }
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 1.5rem; }
+  .stat { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem 1.25rem; }
+  .stat-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px; font-family: 'DM Mono', monospace; }
+  .stat-value { font-size: 28px; font-weight: 600; font-family: 'DM Mono', monospace; }
+  .stat.green .stat-value { color: var(--green); }
+  .stat.amber .stat-value { color: var(--amber); }
+  .stat.red .stat-value { color: var(--red); }
+  .config-toggle { font-size: 12px; color: var(--text-muted); cursor: pointer; text-decoration: underline; margin-bottom: 1rem; display: inline-block; }
+  .config-bar { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.25rem; margin-bottom: 1.5rem; display: flex; gap: 12px; align-items: flex-start; flex-wrap: wrap; }
+  .config-field { display: flex; flex-direction: column; gap: 5px; flex: 1; min-width: 180px; }
+  .config-field label { font-size: 11px; color: var(--text-muted); font-family: 'DM Mono', monospace; text-transform: uppercase; letter-spacing: 0.06em; }
+  .config-field input, .config-field textarea { background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; padding: 7px 10px; color: var(--text); font-size: 12px; outline: none; width: 100%; }
+  .config-field textarea { resize: vertical; min-height: 70px; font-family: 'DM Sans', sans-serif; }
+  .config-field input:focus, .config-field textarea:focus { border-color: #444; }
+  .config-hint { font-size: 11px; color: var(--text-muted); margin-top: 3px; }
+  .toolbar { display: flex; gap: 10px; margin-bottom: 1rem; align-items: center; }
+  .search { flex: 1; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 8px 14px; color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 13px; outline: none; transition: border-color 0.15s; }
+  .search:focus { border-color: #444; }
+  .search::placeholder { color: var(--text-muted); }
+  .filter-btn { padding: 7px 14px; border-radius: 8px; border: 1px solid var(--border); background: transparent; color: var(--text-muted); font-size: 12px; cursor: pointer; font-family: 'DM Mono', monospace; transition: all 0.15s; }
+  .filter-btn.active { background: var(--surface2); color: var(--text); border-color: #444; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  thead th { text-align: left; padding: 10px 14px; color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; font-family: 'DM Mono', monospace; font-weight: 400; border-bottom: 1px solid var(--border); }
+  tbody tr { border-bottom: 1px solid var(--border); transition: background 0.1s; }
+  tbody tr:hover { background: var(--surface); }
+  td { padding: 12px 14px; vertical-align: middle; }
+  .badge { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-family: 'DM Mono', monospace; font-weight: 500; }
+  .badge-green { background: var(--green-dim); color: var(--green); }
+  .badge-amber { background: var(--amber-dim); color: var(--amber); }
+  .badge-red { background: var(--red-dim); color: var(--red); }
+  .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .action-btn { padding: 5px 12px; border-radius: 6px; border: 1px solid var(--border); background: transparent; color: var(--text-muted); font-size: 12px; cursor: pointer; font-family: 'DM Sans', sans-serif; transition: all 0.15s; margin-right: 4px; }
+  .action-btn:hover { background: var(--surface2); color: var(--text); }
+  .action-btn.pagar { border-color: #00e67644; color: var(--green); }
+  .action-btn.pagar:hover { background: var(--green-dim); }
+  .action-btn.wa { border-color: #25d36644; color: var(--wa); }
+  .action-btn.wa:hover { background: var(--wa-dim); }
+  .action-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+  .wa-status { font-size: 11px; font-family: 'DM Mono', monospace; margin-left: 2px; }
+  .wa-status.ok { color: var(--wa); }
+  .wa-status.err { color: var(--red); }
+  .empty { text-align: center; padding: 4rem; color: var(--text-muted); }
+  .empty-icon { font-size: 2rem; margin-bottom: 1rem; }
+  .upload-zone { border: 2px dashed var(--border); border-radius: var(--radius); padding: 3rem; text-align: center; cursor: pointer; transition: all 0.2s; margin-bottom: 2rem; }
+  .upload-zone:hover { border-color: var(--green); background: var(--green-dim); }
+  .upload-zone p { color: var(--text-muted); font-size: 14px; margin-top: 0.5rem; }
+  .upload-zone .icon { font-size: 2.5rem; }
+  #fileInput { display: none; }
+  .modal-overlay { display: none; position: fixed; inset: 0; background: #000000cc; z-index: 100; align-items: center; justify-content: center; }
+  .modal-overlay.show { display: flex; }
+  .modal { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 2rem; width: 420px; max-width: 90vw; }
+  .modal h2 { font-size: 1.1rem; font-weight: 500; margin-bottom: 0.5rem; }
+  .modal p { color: var(--text-muted); font-size: 13px; margin-bottom: 1.5rem; }
+  .modal-name { font-family: 'DM Mono', monospace; color: var(--green); font-size: 1rem; }
+  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
+  .meses { display: flex; gap: 8px; margin-bottom: 1.5rem; flex-wrap: wrap; }
+  .mes-btn { padding: 6px 14px; border-radius: 6px; border: 1px solid var(--border); background: transparent; color: var(--text-muted); font-size: 12px; cursor: pointer; font-family: 'DM Mono', monospace; transition: all 0.15s; }
+  .mes-btn.selected, .mes-btn:hover { background: var(--green-dim); border-color: var(--green); color: var(--green); }
+  .preview-msg { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 12px; font-size: 13px; color: var(--text-muted); margin-bottom: 1.5rem; white-space: pre-wrap; line-height: 1.6; }
+  .table-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+  .nombre-cell { font-weight: 500; }
+  .tel-cell { font-family: 'DM Mono', monospace; color: var(--text-muted); font-size: 12px; }
+  .toast { position: fixed; bottom: 2rem; right: 2rem; background: var(--surface2); border: 1px solid var(--green); color: var(--green); padding: 12px 20px; border-radius: 10px; font-size: 13px; font-family: 'DM Mono', monospace; opacity: 0; transform: translateY(10px); transition: all 0.3s; z-index: 200; }
+  .toast.show { opacity: 1; transform: translateY(0); }
+  .toast.error { border-color: var(--red); color: var(--red); }
+  #configPanel { display: none; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Panel de <span>Licencias</span></h1>
+  <div class="header-actions">
+    <button class="btn" onclick="document.getElementById('fileInput').click()">Cargar Excel</button>
+    <button class="btn btn-primary" onclick="exportarExcel()">Exportar Excel</button>
+  </div>
+</header>
+
+<input type="file" id="fileInput" accept=".xlsx,.xls" onchange="cargarExcel(event)">
+
+<div id="uploadZone" class="upload-zone" onclick="document.getElementById('fileInput').click()">
+  <div class="icon">📂</div>
+  <strong>Cargá tu clientes.xlsx</strong>
+  <p>Hacé clic acá o arrastrá el archivo</p>
+</div>
+
+<div id="mainContent" style="display:none">
+
+  <div class="stats">
+    <div class="stat"><div class="stat-label">Total clientes</div><div class="stat-value" id="statTotal">0</div></div>
+    <div class="stat red"><div class="stat-label">Vencidos / hoy</div><div class="stat-value" id="statVencidos">0</div></div>
+    <div class="stat amber"><div class="stat-label">Próximos 7 días</div><div class="stat-value" id="statProximos">0</div></div>
+    <div class="stat green"><div class="stat-label">Al día</div><div class="stat-value" id="statOk">0</div></div>
+  </div>
+
+  <span class="config-toggle" onclick="toggleConfig()">⚙ Configurar WhatsApp / Twilio</span>
+
+  <div id="configPanel">
+    <div class="config-bar">
+      <div class="config-field">
+        <label>Account SID</label>
+        <input type="text" id="cfgSid" placeholder="ACxxxxxxxxxxxxxxxx" oninput="guardarConfig()">
+      </div>
+      <div class="config-field">
+        <label>Auth Token</label>
+        <input type="password" id="cfgToken" placeholder="••••••••••••••••" oninput="guardarConfig()">
+      </div>
+      <div class="config-field">
+        <label>Mensaje pregrabado</label>
+        <textarea id="cfgMensaje" oninput="guardarConfig()">Hola {nombre}! 👋
+
+Tu licencia vence el {fecha} ({dias}).
+Contactanos para renovarla y no perder el acceso.
+¡Gracias! 🙌</textarea>
+        <span class="config-hint">Usá {nombre}, {fecha} y {dias} como variables</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <input class="search" type="text" placeholder="Buscar cliente..." oninput="filtrar()" id="searchInput">
+    <button class="filter-btn active" onclick="setFiltro('todos', this)">Todos</button>
+    <button class="filter-btn" onclick="setFiltro('urgente', this)">Urgentes</button>
+    <button class="filter-btn" onclick="setFiltro('proximo', this)">Próximos</button>
+    <button class="filter-btn" onclick="setFiltro('ok', this)">Al día</button>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Nombre</th>
+          <th>Teléfono</th>
+          <th>Vencimiento</th>
+          <th>Estado</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody id="tabla"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Modal pago -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <h2>Registrar pago</h2>
+    <p>Renovar licencia de <span class="modal-name" id="modalNombre"></span></p>
+    <p style="margin-bottom:0.75rem; color: var(--text-muted); font-size:12px;">¿Cuántos meses renovó?</p>
+    <div class="meses">
+      <button class="mes-btn selected" onclick="selMes(this,1)">1 mes</button>
+      <button class="mes-btn" onclick="selMes(this,2)">2 meses</button>
+      <button class="mes-btn" onclick="selMes(this,3)">3 meses</button>
+      <button class="mes-btn" onclick="selMes(this,6)">6 meses</button>
+      <button class="mes-btn" onclick="selMes(this,12)">1 año</button>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" onclick="cerrarModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="confirmarPago()">Confirmar pago</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal WhatsApp -->
+<div class="modal-overlay" id="modalWa">
+  <div class="modal">
+    <h2>Enviar WhatsApp</h2>
+    <p>Mensaje para <span class="modal-name" id="waNombre"></span></p>
+    <div class="preview-msg" id="waPreview"></div>
+    <div class="modal-actions">
+      <button class="btn" onclick="cerrarWa()">Cancelar</button>
+      <button class="btn btn-wa" onclick="enviarWa()">Enviar WhatsApp</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+let clientes = [];
+let filtroActual = 'todos';
+let clienteSelIdx = null;
+let mesesSel = 1;
+let waIdx = null;
+
+
+function guardarConfig() {
+  localStorage.setItem('twilio_mensaje', document.getElementById('cfgMensaje').value);
+}
+
+function cargarConfig() {
+  const mensaje = localStorage.getItem('twilio_mensaje') || `Hola {nombre}! 👋\n\nTu licencia vence el {fecha} ({dias}).\nContactanos para renovarla y no perder el acceso.\n¡Gracias! 🙌`;
+  document.getElementById('cfgMensaje').value = mensaje;
+}
+
+async function verificarServidor() {
+  const el = document.getElementById('cfgStatus');
+  try {
+    const resp = await fetch('http://localhost:5050/config');
+    const data = await resp.json();
+    if (data.ok) {
+      el.textContent = '✓ Servidor conectado — credenciales cargadas desde .env';
+      el.style.color = 'var(--green)';
+    } else {
+      el.textContent = '⚠ Servidor conectado pero faltan credenciales en .env';
+      el.style.color = 'var(--amber)';
+    }
+  } catch {
+    el.textContent = '✗ Servidor no encontrado — ejecutá: python servidor_wa.py';
+    el.style.color = 'var(--red)';
+  }
+}
+
+function toggleConfig() {
+  const p = document.getElementById('configPanel');
+  p.style.display = p.style.display === 'none' ? 'block' : 'none';
+}
+
+function cargarExcel(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const wb = XLSX.read(ev.target.result, {type:'binary', cellDates:true});
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const data = XLSX.utils.sheet_to_json(ws);
+    clientes = data.map((row, i) => {
+      const keys = Object.keys(row);
+      const nombreKey = keys.find(k => k.toLowerCase().includes('nombre')) || keys[0];
+      const telKey    = keys.find(k => k.toLowerCase().includes('tel') || k.toLowerCase().includes('fono')) || keys[1];
+      const fechaKey  = keys.find(k => k.toLowerCase().includes('fecha') || k.toLowerCase().includes('venc')) || keys[2];
+      let fecha = row[fechaKey];
+      if (!(fecha instanceof Date)) fecha = new Date(fecha);
+      return { idx: i, nombre: row[nombreKey], telefono: String(row[telKey]), vencimiento: fecha, waEnviado: false };
+    });
+    document.getElementById('uploadZone').style.display = 'none';
+    document.getElementById('mainContent').style.display = 'block';
+    renderizar();
+    toast('Excel cargado: ' + clientes.length + ' clientes');
+  };
+  reader.readAsBinaryString(file);
+}
+
+function getEstado(fecha) {
+  const hoy = new Date(); hoy.setHours(0,0,0,0);
+  const f = new Date(fecha); f.setHours(0,0,0,0);
+  const diff = Math.round((f - hoy) / 86400000);
+  if (diff < 0)   return { tipo:'urgente', label:'Vencido',    dias: diff };
+  if (diff === 0) return { tipo:'urgente', label:'Vence hoy',  dias: 0 };
+  if (diff <= 7)  return { tipo:'proximo', label:`${diff}d`,   dias: diff };
+  return                  { tipo:'ok',     label:`${diff}d`,   dias: diff };
+}
+
+function badgeHtml(estado) {
+  const cls   = estado.tipo === 'urgente' ? 'badge-red' : estado.tipo === 'proximo' ? 'badge-amber' : 'badge-green';
+  const label = estado.tipo === 'urgente' ? estado.label : (estado.tipo === 'proximo' ? `⚠ ${estado.label}` : `✓ ${estado.label}`);
+  return `<span class="badge ${cls}"><span class="dot"></span>${label}</span>`;
+}
+
+function formatFecha(d) {
+  if (!d) return '-';
+  return new Date(d).toLocaleDateString('es-AR', {day:'2-digit', month:'2-digit', year:'numeric'});
+}
+
+function formatFechaISO(d) { return new Date(d).toISOString().split('T')[0]; }
+
+function armarMensaje(c) {
+  const estado = getEstado(c.vencimiento);
+  const plantilla = document.getElementById('cfgMensaje').value;
+  const diasLabel = estado.dias < 0 ? 'VENCIDA' : estado.dias === 0 ? 'HOY' : `en ${estado.dias} día${estado.dias > 1 ? 's' : ''}`;
+  return plantilla
+    .replace(/{nombre}/g, c.nombre)
+    .replace(/{fecha}/g,  formatFecha(c.vencimiento))
+    .replace(/{dias}/g,   diasLabel);
+}
+
+function renderizar() {
+  const search   = (document.getElementById('searchInput')?.value || '').toLowerCase();
+  const filtrados = clientes.filter(c => {
+    const estado = getEstado(c.vencimiento);
+    return c.nombre.toLowerCase().includes(search) || c.telefono.includes(search)
+      ? (filtroActual === 'todos' || estado.tipo === filtroActual)
+      : false;
+  });
+
+  let vencidos=0, proximos=0, ok=0;
+  clientes.forEach(c => {
+    const e = getEstado(c.vencimiento);
+    if (e.tipo==='urgente') vencidos++;
+    else if (e.tipo==='proximo') proximos++;
+    else ok++;
+  });
+  document.getElementById('statTotal').textContent    = clientes.length;
+  document.getElementById('statVencidos').textContent = vencidos;
+  document.getElementById('statProximos').textContent = proximos;
+  document.getElementById('statOk').textContent       = ok;
+
+  const tbody = document.getElementById('tabla');
+  if (!filtrados.length) {
+    tbody.innerHTML = `<tr><td colspan="6"><div class="empty"><div class="empty-icon">🔍</div>No hay clientes que coincidan</div></td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = filtrados.map(c => {
+    const estado  = getEstado(c.vencimiento);
+    const waLabel = c.waEnviado ? '✓ Enviado' : '💬 WhatsApp';
+    return `<tr>
+      <td class="nombre-cell">${c.nombre}</td>
+      <td class="tel-cell">${c.telefono}</td>
+      <td>${formatFecha(c.vencimiento)}</td>
+      <td>${badgeHtml(estado)}</td>
+      <td>
+        <button class="action-btn pagar" onclick="abrirModal(${c.idx})">Registrar pago</button>
+        <button class="action-btn wa" onclick="abrirWa(${c.idx})" id="waBtn_${c.idx}">${waLabel}</button>
+        <button class="action-btn" onclick="editarFecha(${c.idx})">Editar fecha</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function filtrar() { renderizar(); }
+
+function setFiltro(f, btn) {
+  filtroActual = f;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderizar();
+}
+
+// ── Pago ──
+function abrirModal(idx) {
+  clienteSelIdx = idx; mesesSel = 1;
+  document.getElementById('modalNombre').textContent = clientes[idx].nombre;
+  document.querySelectorAll('.mes-btn').forEach((b,i) => b.classList.toggle('selected', i===0));
+  document.getElementById('modalOverlay').classList.add('show');
+}
+function cerrarModal() { document.getElementById('modalOverlay').classList.remove('show'); clienteSelIdx = null; }
+function selMes(btn, m) { mesesSel = m; document.querySelectorAll('.mes-btn').forEach(b => b.classList.remove('selected')); btn.classList.add('selected'); }
+function confirmarPago() {
+  if (clienteSelIdx === null) return;
+  const c = clientes[clienteSelIdx];
+  const base = new Date(c.vencimiento); base.setHours(0,0,0,0);
+  const hoy  = new Date(); hoy.setHours(0,0,0,0);
+  const desde = base < hoy ? hoy : base;
+  desde.setMonth(desde.getMonth() + mesesSel);
+  clientes[clienteSelIdx].vencimiento = desde;
+  cerrarModal(); renderizar();
+  toast(`✓ Pago registrado — ${c.nombre} renovado ${mesesSel} mes${mesesSel>1?'es':''}`);
+}
+
+// ── WhatsApp ──
+function abrirWa(idx) {
+  waIdx = idx;
+  const c = clientes[idx];
+  document.getElementById('waNombre').textContent  = c.nombre;
+  document.getElementById('waPreview').textContent = armarMensaje(c);
+  document.getElementById('modalWa').classList.add('show');
+}
+
+function cerrarWa() { document.getElementById('modalWa').classList.remove('show'); waIdx = null; }
+
+async function enviarWa() {
+  if (waIdx === null) return;
+  const c   = clientes[waIdx];
+  const msg = armarMensaje(c);
+  const tel = c.telefono.replace(/\D/g,'');
+
+  const btn = document.querySelector('#modalWa .btn-wa');
+  btn.textContent = 'Enviando...'; btn.disabled = true;
+
+  try {
+    const resp = await fetch('http://localhost:5050/enviar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ telefono: tel, mensaje: msg })
+    });
+    const data = await resp.json();
+    if (data.ok) {
+      clientes[waIdx].waEnviado = true;
+      cerrarWa(); renderizar();
+      toast('✓ WhatsApp enviado a ' + c.nombre);
+    } else {
+      throw new Error(data.error || 'Error desconocido');
+    }
+  } catch(err) {
+    if (err.message.includes('fetch')) {
+      toast('Error: El servidor local no está corriendo. Ejecutá servidor_wa.py primero.', true);
+    } else {
+      toast('Error: ' + err.message, true);
+    }
+  } finally {
+    btn.textContent = 'Enviar WhatsApp'; btn.disabled = false;
+  }
+}
+
+function editarFecha(idx) {
+  const c = clientes[idx];
+  const nueva = prompt(`Nueva fecha para ${c.nombre} (YYYY-MM-DD):`, formatFechaISO(c.vencimiento));
+  if (!nueva) return;
+  const d = new Date(nueva);
+  if (isNaN(d)) { alert('Fecha inválida'); return; }
+  clientes[idx].vencimiento = d; renderizar(); toast('Fecha actualizada');
+}
+
+function exportarExcel() {
+  if (!clientes.length) { toast('No hay datos para exportar'); return; }
+  const data = clientes.map(c => ({ 'Nombre': c.nombre, 'Teléfono': c.telefono, 'Fecha Vencimiento': formatFechaISO(c.vencimiento) }));
+  const ws = XLSX.utils.json_to_sheet(data);
+  ws['!cols'] = [{wch:22},{wch:16},{wch:20}];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Clientes');
+  const ahora = new Date();
+  const fecha = ahora.toLocaleDateString('es-AR').replace(/\//g,'-');
+  const hora  = ahora.toTimeString().slice(0,8).replace(/:/g,'h');
+  XLSX.writeFile(wb, `clientes_${fecha}_${hora}.xlsx`);
+  toast('Excel exportado correctamente');
+}
+
+function toast(msg, err=false) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (err ? ' error' : '');
+  setTimeout(() => t.classList.remove('show'), 3500);
+}
+
+// Drag & drop
+const zone = document.getElementById('uploadZone');
+zone.addEventListener('dragover', e => { e.preventDefault(); zone.style.borderColor = 'var(--green)'; });
+zone.addEventListener('dragleave', () => { zone.style.borderColor = ''; });
+zone.addEventListener('drop', e => {
+  e.preventDefault(); zone.style.borderColor = '';
+  const file = e.dataTransfer.files[0];
+  if (file) cargarExcel({target:{files:[file]}});
+});
+
+cargarConfig();
+verificarServidor();
+</script>
+</body>
+</html>
