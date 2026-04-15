@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Panel de Licencias</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap');
+  :root {
+    --bg: #0f0f0f; --surface: #181818; --surface2: #222222; --border: #2a2a2a;
+    --green: #00e676; --green-dim: #00e67622; --amber: #ffab00; --amber-dim: #ffab0022;
+    --red: #ff5252; --red-dim: #ff525222; --wa: #25d366; --wa-dim: #25d36622;
+    --text: #f0f0f0; --text-muted: #888; --radius: 10px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-serif; min-height: 100vh; padding: 2rem; }
+  header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 2rem; padding-bottom: 1.5rem; border-bottom: 1px solid var(--border); }
+  h1 { font-size: 1.4rem; font-weight: 500; letter-spacing: -0.02em; }
+  h1 span { color: var(--green); font-family: 'DM Mono', monospace; }
+  .header-actions { display: flex; gap: 10px; align-items: center; }
+  .btn { padding: 8px 16px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 13px; cursor: pointer; transition: all 0.15s; }
+  .btn:hover { background: var(--surface2); border-color: #444; }
+  .btn-primary { background: var(--green); color: #000; border-color: var(--green); font-weight: 600; }
+  .btn-primary:hover { background: #00ff88; border-color: #00ff88; }
+  .btn-wa { background: var(--wa); color: #000; border-color: var(--wa); font-weight: 600; }
+  .btn-wa:hover { background: #2fea72; }
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 1.5rem; }
+  .stat { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem 1.25rem; }
+  .stat-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px; font-family: 'DM Mono', monospace; }
+  .stat-value { font-size: 28px; font-weight: 600; font-family: 'DM Mono', monospace; }
+  .stat.green .stat-value { color: var(--green); }
+  .stat.amber .stat-value { color: var(--amber); }
+  .stat.red .stat-value { color: var(--red); }
+  .status-bar { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 16px; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 10px; font-size: 12px; font-family: 'DM Mono', monospace; }
+  .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-muted); }
+  .status-dot.green { background: var(--green); }
+  .status-dot.red { background: var(--red); }
+  .status-dot.amber { background: var(--amber); animation: pulse 1.5s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+  .toolbar { display: flex; gap: 10px; margin-bottom: 1rem; align-items: center; }
+  .search { flex: 1; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 8px 14px; color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 13px; outline: none; }
+  .search::placeholder { color: var(--text-muted); }
+  .filter-btn { padding: 7px 14px; border-radius: 8px; border: 1px solid var(--border); background: transparent; color: var(--text-muted); font-size: 12px; cursor: pointer; font-family: 'DM Mono', monospace; transition: all 0.15s; }
+  .filter-btn.active { background: var(--surface2); color: var(--text); border-color: #444; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  thead th { text-align: left; padding: 10px 14px; color: var(--text-muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; font-family: 'DM Mono', monospace; font-weight: 400; border-bottom: 1px solid var(--border); }
+  tbody tr { border-bottom: 1px solid var(--border); transition: background 0.1s; }
+  tbody tr:hover { background: var(--surface); }
+  td { padding: 12px 14px; vertical-align: middle; }
+  .badge { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-family: 'DM Mono', monospace; font-weight: 500; }
+  .badge-green { background: var(--green-dim); color: var(--green); }
+  .badge-amber { background: var(--amber-dim); color: var(--amber); }
+  .badge-red { background: var(--red-dim); color: var(--red); }
+  .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .action-btn { padding: 5px 12px; border-radius: 6px; border: 1px solid var(--border); background: transparent; color: var(--text-muted); font-size: 12px; cursor: pointer; font-family: 'DM Sans', sans-serif; transition: all 0.15s; margin-right: 4px; }
+  .action-btn:hover { background: var(--surface2); color: var(--text); }
+  .action-btn.pagar { border-color: #00e67644; color: var(--green); }
+  .action-btn.pagar:hover { background: var(--green-dim); }
+  .action-btn.wa { border-color: #25d36644; color: var(--wa); }
+  .action-btn.wa:hover { background: var(--wa-dim); }
+  .action-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+  .empty { text-align: center; padding: 4rem; color: var(--text-muted); }
+  .table-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+  .nombre-cell { font-weight: 500; }
+  .tel-cell { font-family: 'DM Mono', monospace; color: var(--text-muted); font-size: 12px; }
+  .modal-overlay { display: none; position: fixed; inset: 0; background: #000000cc; z-index: 100; align-items: center; justify-content: center; }
+  .modal-overlay.show { display: flex; }
+  .modal { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 2rem; width: 420px; max-width: 90vw; }
+  .modal h2 { font-size: 1.1rem; font-weight: 500; margin-bottom: 0.5rem; }
+  .modal p { color: var(--text-muted); font-size: 13px; margin-bottom: 1.5rem; }
+  .modal-name { font-family: 'DM Mono', monospace; color: var(--green); }
+  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
+  .meses { display: flex; gap: 8px; margin-bottom: 1.5rem; flex-wrap: wrap; }
+  .mes-btn { padding: 6px 14px; border-radius: 6px; border: 1px solid var(--border); background: transparent; color: var(--text-muted); font-size: 12px; cursor: pointer; font-family: 'DM Mono', monospace; transition: all 0.15s; }
+  .mes-btn.selected, .mes-btn:hover { background: var(--green-dim); border-color: var(--green); color: var(--green); }
+  .preview-msg { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 12px; font-size: 13px; color: var(--text-muted); margin-bottom: 1.5rem; white-space: pre-wrap; line-height: 1.6; }
+  .toast { position: fixed; bottom: 2rem; right: 2rem; background: var(--surface2); border: 1px solid var(--green); color: var(--green); padding: 12px 20px; border-radius: 10px; font-size: 13px; font-family: 'DM Mono', monospace; opacity: 0; transform: translateY(10px); transition: all 0.3s; z-index: 200; }
+  .toast.show { opacity: 1; transform: translateY(0); }
+  .toast.error { border-color: var(--red); color: var(--red); }
+  .loading { text-align: center; padding: 3rem; color: var(--text-muted); font-family: 'DM Mono', monospace; font-size: 13px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Panel de <span>Licencias</span></h1>
+  <div class="header-actions">
+    <button class="btn" onclick="cargarClientes()">↻ Actualizar</button>
+    <button class="btn btn-primary" onclick="abrirAgregar()">+ Agregar cliente</button>
+  </div>
+</header>
+
+<div class="status-bar">
+  <div class="status-dot amber" id="statusDot"></div>
+  <span id="statusText">Conectando con Google Sheets...</span>
+</div>
+
+<div class="stats">
+  <div class="stat"><div class="stat-label">Total clientes</div><div class="stat-value" id="statTotal">—</div></div>
+  <div class="stat red"><div class="stat-label">Vencidos / hoy</div><div class="stat-value" id="statVencidos">—</div></div>
+  <div class="stat amber"><div class="stat-label">Próximos 7 días</div><div class="stat-value" id="statProximos">—</div></div>
+  <div class="stat green"><div class="stat-label">Al día</div><div class="stat-value" id="statOk">—</div></div>
+</div>
+
+<div class="toolbar">
+  <input class="search" type="text" placeholder="Buscar cliente..." oninput="filtrar()" id="searchInput">
+  <button class="filter-btn active" onclick="setFiltro('todos', this)">Todos</button>
+  <button class="filter-btn" onclick="setFiltro('urgente', this)">Urgentes</button>
+  <button class="filter-btn" onclick="setFiltro('proximo', this)">Próximos</button>
+  <button class="filter-btn" onclick="setFiltro('ok', this)">Al día</button>
+</div>
+
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th>Nombre</th><th>Teléfono</th><th>Vencimiento</th><th>Estado</th><th>Acciones</th>
+      </tr>
+    </thead>
+    <tbody id="tabla"><tr><td colspan="5"><div class="loading">⏳ Cargando clientes...</div></td></tr></tbody>
+  </table>
+</div>
+
+<!-- Modal pago -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <h2>Registrar pago</h2>
+    <p>Renovar licencia de <span class="modal-name" id="modalNombre"></span></p>
+    <p style="margin-bottom:0.75rem;font-size:12px;">¿Cuántos meses renovó?</p>
+    <div class="meses">
+      <button class="mes-btn selected" onclick="selMes(this,1)">1 mes</button>
+      <button class="mes-btn" onclick="selMes(this,2)">2 meses</button>
+      <button class="mes-btn" onclick="selMes(this,3)">3 meses</button>
+      <button class="mes-btn" onclick="selMes(this,6)">6 meses</button>
+      <button class="mes-btn" onclick="selMes(this,12)">1 año</button>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" onclick="cerrarModal()">Cancelar</button>
+      <button class="btn btn-primary" id="btnConfirmarPago" onclick="confirmarPago()">Confirmar pago</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal WhatsApp -->
+<div class="modal-overlay" id="modalWa">
+  <div class="modal">
+    <h2>Enviar WhatsApp</h2>
+    <p>Mensaje para <span class="modal-name" id="waNombre"></span></p>
+    <div class="preview-msg" id="waPreview"></div>
+    <div class="modal-actions">
+      <button class="btn" onclick="cerrarWa()">Cancelar</button>
+      <button class="btn btn-wa" id="btnEnviarWa" onclick="enviarWa()">Enviar WhatsApp</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal agregar cliente -->
+<div class="modal-overlay" id="modalAgregar">
+  <div class="modal">
+    <h2>Agregar cliente</h2>
+    <div style="display:flex;flex-direction:column;gap:12px;margin-bottom:1.5rem;">
+      <div style="display:flex;flex-direction:column;gap:5px;">
+        <label style="font-size:11px;color:var(--text-muted);font-family:'DM Mono',monospace;text-transform:uppercase;">Nombre</label>
+        <input type="text" id="nuevoNombre" style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:8px 10px;color:var(--text);font-size:13px;outline:none;" placeholder="Juan García">
+      </div>
+      <div style="display:flex;flex-direction:column;gap:5px;">
+        <label style="font-size:11px;color:var(--text-muted);font-family:'DM Mono',monospace;text-transform:uppercase;">Teléfono</label>
+        <input type="text" id="nuevoTel" style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:8px 10px;color:var(--text);font-size:13px;outline:none;" placeholder="2236001234">
+      </div>
+      <div style="display:flex;flex-direction:column;gap:5px;">
+        <label style="font-size:11px;color:var(--text-muted);font-family:'DM Mono',monospace;text-transform:uppercase;">Fecha de vencimiento</label>
+        <input type="date" id="nuevoFecha" style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:8px 10px;color:var(--text);font-size:13px;outline:none;">
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" onclick="cerrarAgregar()">Cancelar</button>
+      <button class="btn btn-primary" onclick="confirmarAgregar()">Agregar</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── Configuración ──────────────────────────────────────────
+const SHEET_ID  = '1ykhzJ8yPpsPu36MppiMIvKcK67jR2DFhbpPeoZ9Bel0';
+const SHEET_NAME = 'Hoja 1';
+const SA_EMAIL  = 'panel-licencias@panel-licencias.iam.gserviceaccount.com';
+const PRIVATE_KEY = `-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCwc1Udtm5wjPSb\nA5b/Rn8StCgG5TNKTqjMW0trjKdZitPDfsY5QzETfloi6+SK4V+docW7/7Dukk81\nMXK+1J3bBkUomaQCRWHupfPbVwv3f7p4ZS/YDXBJHSxSbj/jWWaD7rEPHe0OtQBV\n1CEx0I+LUR5FVYZIgoIndQP0Hdnm3N8Mx6tQjXMDrAB8Kf2Ai19KkIqw3++Jkc91\ngdEyPeDoa+d+ITgzwAAqo7BRHWTwZ9jsEYGEiXT07JZx0K3wyqTlt7IO70ePToQb\nbHPVLMuRaBApVbliNCxyoFaR8MlXYIUv1EiFKzd5X0v5F7DwWx86SYq7lJrn9qux\nV9h0zPKVAgMBAAECggEAC0XjCznrhl9LBVhOXlLHrY86+23LQBUUbbHreJyM2Iip\nDNVdnqzvRrqM0axWdpT9gdmjA2bLjAJm8xQMq6pzx1l4M6bVNpvuLMwHb1z5U7+i\nTyzPyLLbGKC3gzCt/j1o8kbeowObcJQZyGH8GO2lLhZpo65aHOnRnOm57e+2Syx4\nCEEbK8wo7801H77UsW8Y7EJ3CBnIXMIhryMLnsT622GqAR7xGRNvsr4us0WHCg50\nNq2+LaROOra3t0VUNSRqwVOZcAtB9I/nbNA0l8Xlrf2af+Vpy0a/hYy3+YdRFE0n\nHR9zk2/2rbHfiPt9/EdSpQlCMZ3WuTcDqW8O3ZlXhQKBgQDml9JhXm5GCHR08dvP\nBaIQu6gGdL8x3T7nuCK7AZWIoF7pviz/xHPuxmSR38EVnxEapXfL5DzZmNVubzrY\n/auL2c9Gje9G/9r7rlekoZH7+B9paQjfP1oEC3M5DaJJ/z8TMZpKqTW2Ms0qPKWX\n4GnVw/cSSvtnpbsBlrNvv4+kUwKBgQDD5FmI/Rtms4zXmnMVlExF+gEzMAiAIa+B\n+9BGUeHHmSdhfCa1xiWQAUP7r8Wy8WChtuuWPKuBrdcNuEujRh0WIJz8TyCHknSy\nBQpznNxTu5Eip5q0TvaZ3RqOrMO628EfMMGPoK4F+VCyOP1RwSxavkqxAOQETHWy\nBmvlVegwdwKBgQDFjPgNtureUMwEjFf2KitIDpzKuyY5wAPuXNBUSe0j2dC2i9jd\nXh68R3dNidZPgbETlQLmyKhg+xCOxfgyglB/RaDQHzUJLJUc3aX0Qv9gUJgIpJWX\nPR0PLggOruGEZ4pQFUTMBd8gMrGWJ9LuJLJHEtYO8/IiP9fQap1bdU/IRQKBgCqO\nB7lPqs0zwivwPIH6lls5RVt2WtJi/vqQ1p0AGrk+lySBUPN6GRzgeYFKnPsTnrdi\nwmj/ww5H0okDeUL970GoUhIpqlppQXqOx8d30xFJlOzfVidHZCDmvGc0Nsz4Aksh\nT1tBP6zCjXo6ESXafiU0Y4tyMxaP+Z1z8ap/cBJfAoGAGopOLOij9ZZXNF/YfRTz\n/Jj/BYS/HtuRQ2bT2ZiKNK2NfPJJaeRjzKoqj/+Pfp7Zx04vm0PRYzQTNHfUdT7K\n+aZQBH89pc02kduka3GKrQpNHe/FH713boBd4ikMWaplnwOGZiS/MNMcltSv9tZj\n6inLWWaP+44DVRT/dWJBS20=\n-----END PRIVATE KEY-----\n`;
+const MENSAJE_WA = `Hola {nombre}! 👋\n\nTu licencia vence el {fecha} ({dias}).\nContactanos para renovarla y no perder el acceso.\n¡Gracias! 🙌`;
+// ───────────────────────────────────────────────────────────
+
+let clientes = [];
+let filtroActual = 'todos';
+let clienteSelIdx = null;
+let mesesSel = 1;
+let waIdx = null;
+let accessToken = null;
+
+// ── JWT / Auth ─────────────────────────────────────────────
+async function getAccessToken() {
+  const now = Math.floor(Date.now() / 1000);
+  const header  = { alg: 'RS256', typ: 'JWT' };
+  const payload = {
+    iss: SA_EMAIL, scope: 'https://www.googleapis.com/auth/spreadsheets',
+    aud: 'https://oauth2.googleapis.com/token', exp: now + 3600, iat: now
+  };
+  const b64 = s => btoa(unescape(encodeURIComponent(JSON.stringify(s)))).replace(/=/g,'').replace(/\+/g,'-').replace(/\//g,'_');
+  const unsigned = b64(header) + '.' + b64(payload);
+  const key = await importPrivateKey(PRIVATE_KEY);
+  const sig = await crypto.subtle.sign({ name:'RSASSA-PKCS1-v1_5' }, key, new TextEncoder().encode(unsigned));
+  const jwt = unsigned + '.' + btoa(String.fromCharCode(...new Uint8Array(sig))).replace(/=/g,'').replace(/\+/g,'-').replace(/\//g,'_');
+  const resp = await fetch('https://oauth2.googleapis.com/token', {
+    method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'},
+    body: `grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer&assertion=${jwt}`
+  });
+  const data = await resp.json();
+  return data.access_token;
+}
+
+async function importPrivateKey(pem) {
+  const b64 = pem.replace(/-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----|\n/g,'');
+  const bin = atob(b64);
+  const buf = new Uint8Array(bin.length);
+  for (let i=0;i<bin.length;i++) buf[i]=bin.charCodeAt(i);
+  return crypto.subtle.importKey('pkcs8', buf, { name:'RSASSA-PKCS1-v1_5', hash:'SHA-256' }, false, ['sign']);
+}
+
+async function getToken() {
+  if (!accessToken) accessToken = await getAccessToken();
+  return accessToken;
+}
+
+// ── Sheets API ─────────────────────────────────────────────
+async function sheetsGet(range) {
+  const token = await getToken();
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(range)}`;
+  const r = await fetch(url, { headers:{ Authorization:'Bearer '+token }});
+  return r.json();
+}
+
+async function sheetsUpdate(range, values) {
+  const token = await getToken();
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(range)}?valueInputOption=USER_ENTERED`;
+  await fetch(url, { method:'PUT', headers:{ Authorization:'Bearer '+token, 'Content-Type':'application/json' }, body: JSON.stringify({ values }) });
+}
+
+async function sheetsAppend(values) {
+  const token = await getToken();
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${SHEET_ID}/values/${encodeURIComponent(SHEET_NAME+'!A:C')}:append?valueInputOption=USER_ENTERED`;
+  await fetch(url, { method:'POST', headers:{ Authorization:'Bearer '+token, 'Content-Type':'application/json' }, body: JSON.stringify({ values }) });
+}
+
+// ── Cargar clientes ────────────────────────────────────────
+async function cargarClientes() {
+  setStatus('amber', 'Sincronizando con Google Sheets...');
+  try {
+    const data = await sheetsGet(SHEET_NAME+'!A:C');
+    const rows = (data.values || []).slice(1);
+    clientes = rows.map((r, i) => ({
+      idx: i+2, // fila real en sheet (1=header, 2=primera fila)
+      nombre: r[0] || '',
+      telefono: r[1] || '',
+      vencimiento: new Date(r[2] || ''),
+      waEnviado: false
+    })).filter(c => c.nombre);
+    setStatus('green', `Conectado · ${clientes.length} clientes cargados`);
+    renderizar();
+  } catch(e) {
+    setStatus('red', 'Error al conectar con Google Sheets');
+    toast('Error: ' + e.message, true);
+  }
+}
+
+// ── Render ─────────────────────────────────────────────────
+function getEstado(fecha) {
+  const hoy = new Date(); hoy.setHours(0,0,0,0);
+  const f = new Date(fecha); f.setHours(0,0,0,0);
+  const diff = Math.round((f - hoy) / 86400000);
+  if (diff < 0)   return { tipo:'urgente', label:'Vencido',   dias: diff };
+  if (diff === 0) return { tipo:'urgente', label:'Vence hoy', dias: 0 };
+  if (diff <= 7)  return { tipo:'proximo', label:`${diff}d`,  dias: diff };
+  return                  { tipo:'ok',     label:`${diff}d`,  dias: diff };
+}
+
+function badgeHtml(e) {
+  const cls = e.tipo==='urgente'?'badge-red':e.tipo==='proximo'?'badge-amber':'badge-green';
+  const lbl = e.tipo==='urgente'?e.label:e.tipo==='proximo'?`⚠ ${e.label}`:`✓ ${e.label}`;
+  return `<span class="badge ${cls}"><span class="dot"></span>${lbl}</span>`;
+}
+
+function formatFecha(d) {
+  if (!d||isNaN(new Date(d))) return '-';
+  return new Date(d).toLocaleDateString('es-AR',{day:'2-digit',month:'2-digit',year:'numeric'});
+}
+function formatISO(d) { return new Date(d).toISOString().split('T')[0]; }
+
+function renderizar() {
+  const search = (document.getElementById('searchInput')?.value||'').toLowerCase();
+  const filtrados = clientes.filter(c => {
+    const e = getEstado(c.vencimiento);
+    const matchS = c.nombre.toLowerCase().includes(search)||c.telefono.includes(search);
+    return matchS && (filtroActual==='todos'||e.tipo===filtroActual);
+  });
+  let v=0,p=0,ok=0;
+  clientes.forEach(c=>{const e=getEstado(c.vencimiento);if(e.tipo==='urgente')v++;else if(e.tipo==='proximo')p++;else ok++;});
+  document.getElementById('statTotal').textContent=clientes.length;
+  document.getElementById('statVencidos').textContent=v;
+  document.getElementById('statProximos').textContent=p;
+  document.getElementById('statOk').textContent=ok;
+  const tbody=document.getElementById('tabla');
+  if(!filtrados.length){tbody.innerHTML=`<tr><td colspan="5"><div class="empty">🔍 No hay clientes que coincidan</div></td></tr>`;return;}
+  tbody.innerHTML=filtrados.map(c=>{
+    const e=getEstado(c.vencimiento);
+    return `<tr>
+      <td class="nombre-cell">${c.nombre}</td>
+      <td class="tel-cell">${c.telefono}</td>
+      <td>${formatFecha(c.vencimiento)}</td>
+      <td>${badgeHtml(e)}</td>
+      <td>
+        <button class="action-btn pagar" onclick="abrirModal(${c.idx})">Registrar pago</button>
+        <button class="action-btn wa" onclick="abrirWa(${c.idx})">${c.waEnviado?'✓ Enviado':'💬 WhatsApp'}</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function filtrar(){renderizar();}
+function setFiltro(f,btn){filtroActual=f;document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');renderizar();}
+function setStatus(color,msg){document.getElementById('statusDot').className='status-dot '+color;document.getElementById('statusText').textContent=msg;}
+
+// ── Pago ───────────────────────────────────────────────────
+function getClienteByIdx(idx){return clientes.find(c=>c.idx===idx);}
+function abrirModal(idx){clienteSelIdx=idx;mesesSel=1;document.getElementById('modalNombre').textContent=getClienteByIdx(idx).nombre;document.querySelectorAll('.mes-btn').forEach((b,i)=>b.classList.toggle('selected',i===0));document.getElementById('modalOverlay').classList.add('show');}
+function cerrarModal(){document.getElementById('modalOverlay').classList.remove('show');clienteSelIdx=null;}
+function selMes(btn,m){mesesSel=m;document.querySelectorAll('.mes-btn').forEach(b=>b.classList.remove('selected'));btn.classList.add('selected');}
+
+async function confirmarPago() {
+  if(clienteSelIdx===null)return;
+  const c = getClienteByIdx(clienteSelIdx);
+  const base = new Date(c.vencimiento); base.setHours(0,0,0,0);
+  const hoy  = new Date(); hoy.setHours(0,0,0,0);
+  const desde = base < hoy ? hoy : base;
+  desde.setMonth(desde.getMonth()+mesesSel);
+  const nuevaFecha = formatISO(desde);
+  const btn = document.getElementById('btnConfirmarPago');
+  btn.textContent='Guardando...'; btn.disabled=true;
+  try {
+    await sheetsUpdate(`${SHEET_NAME}!C${clienteSelIdx}`, [[nuevaFecha]]);
+    c.vencimiento = desde;
+    cerrarModal(); renderizar();
+    toast(`✓ Pago registrado — ${c.nombre} renovado ${mesesSel} mes${mesesSel>1?'es':''}`);
+  } catch(e) {
+    toast('Error al guardar: '+e.message, true);
+  } finally {
+    btn.textContent='Confirmar pago'; btn.disabled=false;
+  }
+}
+
+// ── WhatsApp ───────────────────────────────────────────────
+function armarMensaje(c) {
+  const e = getEstado(c.vencimiento);
+  const diasLabel = e.dias<0?'VENCIDA':e.dias===0?'HOY':`en ${e.dias} día${e.dias>1?'s':''}`;
+  return MENSAJE_WA.replace(/{nombre}/g,c.nombre).replace(/{fecha}/g,formatFecha(c.vencimiento)).replace(/{dias}/g,diasLabel);
+}
+
+function abrirWa(idx){
+  waIdx=idx;
+  const c=getClienteByIdx(idx);
+  document.getElementById('waNombre').textContent=c.nombre;
+  document.getElementById('waPreview').textContent=armarMensaje(c);
+  document.getElementById('modalWa').classList.add('show');
+}
+function cerrarWa(){document.getElementById('modalWa').classList.remove('show');waIdx=null;}
+
+async function enviarWa() {
+  if(waIdx===null)return;
+  const c=getClienteByIdx(waIdx);
+  const btn=document.getElementById('btnEnviarWa');
+  btn.textContent='Enviando...'; btn.disabled=true;
+  try {
+    const resp=await fetch('http://localhost:5050/enviar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({telefono:c.telefono,mensaje:armarMensaje(c)})});
+    const data=await resp.json();
+    if(data.ok){c.waEnviado=true;cerrarWa();renderizar();toast('✓ WhatsApp enviado a '+c.nombre);}
+    else throw new Error(data.error);
+  } catch(e) {
+    if(e.message.includes('fetch')) toast('Servidor local no encontrado. Ejecutá servidor_wa.py primero.',true);
+    else toast('Error: '+e.message,true);
+  } finally {
+    btn.textContent='Enviar WhatsApp'; btn.disabled=false;
+  }
+}
+
+// ── Agregar cliente ────────────────────────────────────────
+function abrirAgregar(){document.getElementById('nuevoNombre').value='';document.getElementById('nuevoTel').value='';document.getElementById('nuevoFecha').value='';document.getElementById('modalAgregar').classList.add('show');}
+function cerrarAgregar(){document.getElementById('modalAgregar').classList.remove('show');}
+
+async function confirmarAgregar() {
+  const nombre=document.getElementById('nuevoNombre').value.trim();
+  const tel=document.getElementById('nuevoTel').value.trim();
+  const fecha=document.getElementById('nuevoFecha').value;
+  if(!nombre||!tel||!fecha){toast('Completá todos los campos',true);return;}
+  try {
+    await sheetsAppend([[nombre,tel,fecha]]);
+    cerrarAgregar();
+    toast('✓ Cliente agregado');
+    await cargarClientes();
+  } catch(e) {
+    toast('Error al agregar: '+e.message,true);
+  }
+}
+
+function toast(msg,err=false){const t=document.getElementById('toast');t.textContent=msg;t.className='toast show'+(err?' error':'');setTimeout(()=>t.classList.remove('show'),3500);}
+
+cargarClientes();
+</script>
+</body>
+</html>
