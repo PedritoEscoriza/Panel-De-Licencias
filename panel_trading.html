@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🤖 Bot de Trading — Binance</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0b0e14; --panel: #151a23; --panel2: #1c222d; --border: #262d3a;
+    --txt: #e6edf3; --muted: #8b98a9; --verde: #16c784; --rojo: #ea3943;
+    --azul: #3b82f6; --amarillo: #f0b90b;
+  }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg); color: var(--txt); padding: 20px; line-height: 1.5;
+  }
+  .wrap { max-width: 1100px; margin: 0 auto; }
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    flex-wrap: wrap; gap: 12px; margin-bottom: 20px;
+  }
+  h1 { font-size: 22px; display: flex; align-items: center; gap: 10px; }
+  .modo-badge {
+    padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: .5px;
+  }
+  .modo-simulado { background: #1e3a5f; color: #7db8ff; }
+  .modo-testnet  { background: #4a3d0a; color: var(--amarillo); }
+  .modo-real     { background: #4a1015; color: #ff6b74; animation: pulso 1.5s infinite; }
+  @keyframes pulso { 50% { opacity: .55; } }
+
+  .fase-bar {
+    display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap;
+  }
+  .fase {
+    flex: 1; min-width: 110px; padding: 12px; border-radius: 10px;
+    background: var(--panel); border: 1px solid var(--border);
+    text-align: center; font-size: 13px; color: var(--muted);
+    transition: all .3s; position: relative;
+  }
+  .fase.activa { color: var(--txt); border-color: var(--azul); background: var(--panel2); }
+  .fase.activa::after {
+    content: ""; position: absolute; bottom: -1px; left: 10%; width: 80%; height: 2px;
+    background: var(--azul); border-radius: 2px;
+  }
+  .fase .n { font-size: 11px; opacity: .6; }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 20px; }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
+  .card .label { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+  .card .valor { font-size: 22px; font-weight: 700; }
+  .verde { color: var(--verde); } .rojo { color: var(--rojo); }
+
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 760px) { .cols { grid-template-columns: 1fr; } }
+
+  .box { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+  .box h3 { font-size: 14px; margin-bottom: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
+
+  .pensamiento {
+    background: var(--panel2); border-left: 3px solid var(--azul); border-radius: 8px;
+    padding: 14px; font-size: 15px; min-height: 60px;
+  }
+
+  .ind { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
+  .ind:last-child { border-bottom: none; }
+  .ind .k { color: var(--muted); }
+
+  .log { max-height: 340px; overflow-y: auto; font-size: 13px; }
+  .log-item { padding: 8px 10px; border-radius: 6px; margin-bottom: 4px; background: var(--panel2); }
+  .log-item .hora { color: var(--muted); font-size: 11px; margin-right: 8px; }
+  .log-compra { border-left: 3px solid var(--verde); }
+  .log-venta  { border-left: 3px solid var(--amarillo); }
+  .log-error  { border-left: 3px solid var(--rojo); }
+  .log-info   { border-left: 3px solid var(--azul); }
+
+  .controles { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  button {
+    border: none; border-radius: 10px; padding: 14px 28px; font-size: 16px; font-weight: 700;
+    cursor: pointer; transition: transform .1s, opacity .2s;
+  }
+  button:active { transform: scale(.97); }
+  button:disabled { opacity: .4; cursor: not-allowed; }
+  .btn-on  { background: var(--verde); color: #041b12; }
+  .btn-off { background: var(--rojo); color: #fff; }
+  .btn-panico { background: transparent; color: var(--rojo); border: 1px solid var(--rojo); padding: 14px 18px; font-size: 13px; }
+
+  .estado-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; }
+  .on  { background: var(--verde); box-shadow: 0 0 8px var(--verde); }
+  .off { background: var(--muted); }
+  .aviso { font-size: 12px; color: var(--muted); margin-top: 10px; }
+  .warn-real { background: #4a1015; color: #ff9ba1; padding: 12px; border-radius: 8px; margin-bottom: 16px; font-size: 14px; display:none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>🤖 Bot de Trading <span id="symbol" style="color:var(--muted);font-weight:400;">—</span></h1>
+    <span id="modoBadge" class="modo-badge modo-simulado">simulado</span>
+  </header>
+
+  <div id="warnReal" class="warn-real">⚠️ <b>MODO REAL activado</b> — el bot opera con plata de verdad.</div>
+
+  <!-- Fases -->
+  <div class="fase-bar">
+    <div class="fase" data-fase="APAGADO"><div class="n">estado</div>⏻ Apagado</div>
+    <div class="fase" data-fase="CARGANDO"><div class="n">fase 1</div>📥 Cargando</div>
+    <div class="fase" data-fase="ANALIZANDO"><div class="n">fase 2</div>🔍 Analizando</div>
+    <div class="fase" data-fase="OPERANDO"><div class="n">fase 3</div>⚡ Operando</div>
+  </div>
+
+  <!-- Métricas -->
+  <div class="grid">
+    <div class="card"><div class="label">Precio actual</div><div class="valor" id="precio">—</div></div>
+    <div class="card"><div class="label">Capital (USDT)</div><div class="valor" id="capital">—</div></div>
+    <div class="card"><div class="label">P&L de la sesión</div><div class="valor" id="pnl">—</div></div>
+    <div class="card"><div class="label">Comisiones pagadas</div><div class="valor" id="comisiones">—</div></div>
+    <div class="card"><div class="label">Operaciones</div><div class="valor" id="ops">—</div></div>
+    <div class="card"><div class="label">% aciertos</div><div class="valor" id="winrate">—</div></div>
+  </div>
+
+  <div class="cols">
+    <div>
+      <!-- Pensamiento -->
+      <div class="box">
+        <h3>💭 Qué está pensando</h3>
+        <div class="pensamiento" id="pensamiento">El bot está apagado.</div>
+      </div>
+
+      <!-- Posición -->
+      <div class="box">
+        <h3>📊 Posición abierta</h3>
+        <div id="posicion" style="color:var(--muted)">Ninguna posición abierta.</div>
+      </div>
+
+      <!-- Indicadores -->
+      <div class="box">
+        <h3>📈 Indicadores</h3>
+        <div class="ind"><span class="k">EMA rápida</span><span id="emaR">—</span></div>
+        <div class="ind"><span class="k">EMA lenta</span><span id="emaL">—</span></div>
+        <div class="ind"><span class="k">RSI</span><span id="rsi">—</span></div>
+      </div>
+    </div>
+
+    <div>
+      <!-- Log -->
+      <div class="box">
+        <h3>📜 Registro en vivo</h3>
+        <div class="log" id="log"><div style="color:var(--muted)">Sin actividad todavía.</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Controles -->
+  <div class="box">
+    <h3><span id="dot" class="estado-dot off"></span><span id="estadoTxt">Apagado</span></h3>
+    <div class="controles">
+      <button id="btnOn"  class="btn-on"  onclick="encender()">▶ Encender</button>
+      <button id="btnOff" class="btn-off" onclick="apagar(false)" disabled>■ Apagar</button>
+      <button id="btnPanico" class="btn-panico" onclick="apagar(true)" disabled>🛑 Apagar y cerrar todo</button>
+    </div>
+    <div class="aviso">
+      "Encender" carga el mercado, analiza y recién ahí opera — y sigue re-analizando en loop.
+      "Apagar y cerrar todo" cierra cualquier posición abierta (botón de pánico).
+    </div>
+  </div>
+
+</div>
+
+<script>
+const API = location.origin;
+
+async function encender() {
+  await fetch(API + "/encender", { method: "POST" });
+  actualizar();
+}
+async function apagar(cerrarTodo) {
+  await fetch(API + "/apagar", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ cerrar_todo: cerrarTodo })
+  });
+  actualizar();
+}
+
+function fmt(n, dec = 2) {
+  if (n === null || n === undefined) return "—";
+  return Number(n).toLocaleString("es-AR", { minimumFractionDigits: dec, maximumFractionDigits: dec });
+}
+
+async function actualizar() {
+  let s;
+  try {
+    s = await (await fetch(API + "/estado")).json();
+  } catch (e) { return; }
+
+  // Modo
+  const badge = document.getElementById("modoBadge");
+  badge.textContent = s.modo;
+  badge.className = "modo-badge modo-" + s.modo;
+  document.getElementById("warnReal").style.display = s.modo === "real" ? "block" : "none";
+  document.getElementById("symbol").textContent = s.symbol;
+
+  // Fases
+  document.querySelectorAll(".fase").forEach(f =>
+    f.classList.toggle("activa", f.dataset.fase === s.fase));
+
+  // Métricas
+  document.getElementById("precio").textContent = s.precio ? "$" + fmt(s.precio) : "—";
+  document.getElementById("capital").textContent = "$" + fmt(s.capital);
+  const pnl = document.getElementById("pnl");
+  pnl.textContent = (s.pnl >= 0 ? "+$" : "-$") + fmt(Math.abs(s.pnl));
+  pnl.className = "valor " + (s.pnl >= 0 ? "verde" : "rojo");
+  document.getElementById("comisiones").textContent = "$" + fmt(s.comisiones, 2);
+  document.getElementById("ops").textContent = s.operaciones + " (" + s.ganadoras + " ✓)";
+  document.getElementById("winrate").textContent = s.operaciones ? s.win_rate + "%" : "—";
+
+  // Pensamiento
+  document.getElementById("pensamiento").textContent = s.pensamiento;
+
+  // Posición
+  const pos = document.getElementById("posicion");
+  if (s.posicion) {
+    const p = s.posicion;
+    const cambio = s.precio ? ((s.precio - p.precio_entrada) / p.precio_entrada * 100) : 0;
+    const cls = cambio >= 0 ? "verde" : "rojo";
+    pos.innerHTML = `
+      Entrada: <b>$${fmt(p.precio_entrada)}</b> · Cantidad: <b>${fmt(p.cantidad, 6)}</b><br>
+      Valor actual: <b>$${fmt(s.valor_posicion)}</b> ·
+      Variación: <b class="${cls}">${cambio >= 0 ? "+" : ""}${fmt(cambio)}%</b>`;
+    pos.style.color = "var(--txt)";
+  } else {
+    pos.textContent = "Ninguna posición abierta.";
+    pos.style.color = "var(--muted)";
+  }
+
+  // Indicadores
+  const ind = s.indicadores || {};
+  document.getElementById("emaR").textContent = ind.ema_rapida ? "$" + fmt(ind.ema_rapida) : "—";
+  document.getElementById("emaL").textContent = ind.ema_lenta ? "$" + fmt(ind.ema_lenta) : "—";
+  const rsiEl = document.getElementById("rsi");
+  if (ind.rsi != null) {
+    rsiEl.textContent = ind.rsi;
+    rsiEl.className = ind.rsi > 70 ? "rojo" : ind.rsi < 30 ? "verde" : "";
+  } else rsiEl.textContent = "—";
+
+  // Log
+  const log = document.getElementById("log");
+  if (s.log && s.log.length) {
+    log.innerHTML = s.log.map(l =>
+      `<div class="log-item log-${l.tipo}"><span class="hora">${l.hora}</span>${l.texto}</div>`
+    ).join("");
+  }
+
+  // Estado / botones
+  const dot = document.getElementById("dot");
+  dot.className = "estado-dot " + (s.encendido ? "on" : "off");
+  document.getElementById("estadoTxt").textContent =
+    s.encendido ? "Encendido · " + s.fase : "Apagado";
+  document.getElementById("btnOn").disabled = s.encendido;
+  document.getElementById("btnOff").disabled = !s.encendido;
+  document.getElementById("btnPanico").disabled = !s.encendido;
+
+  if (s.error) {
+    document.getElementById("pensamiento").textContent = "⚠️ " + s.error;
+  }
+}
+
+setInterval(actualizar, 1000);
+actualizar();
+</script>
+</body>
+</html>

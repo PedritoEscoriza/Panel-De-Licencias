@@ -2,3 +2,4 @@ twilio
 pandas
 openpyxl
 python-dotenv
+ccxt
