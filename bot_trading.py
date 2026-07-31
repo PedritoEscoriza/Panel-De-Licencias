@@ -173,6 +173,33 @@ def macd(valores, rapida=12, lenta=26, senal=9):
     return round(macd_line[-1], 2), round(signal[-1], 2), round(macd_line[-1] - signal[-1], 2)
 
 
+# ── Datos de mercado con respaldo (si Binance está bloqueado, usa otro) ──────
+# Para los DATOS (precios/velas) sirve cualquier exchange. Probamos varios y
+# usamos el primero que responda. Las órdenes reales siguen yendo a Binance.
+EXCHANGES_DATOS = ["binance", "kucoin", "kraken", "okx", "coinbase"]
+_cache_ex_datos = {}
+
+
+def _exchange_datos(ex_id):
+    if ex_id not in _cache_ex_datos:
+        _cache_ex_datos[ex_id] = getattr(ccxt, ex_id)({"enableRateLimit": True})
+    return _cache_ex_datos[ex_id]
+
+
+def bajar_velas(symbol, timeframe, limit):
+    """Baja velas probando varios exchanges. Devuelve (velas, nombre_exchange)."""
+    ultimo_error = None
+    for ex_id in EXCHANGES_DATOS:
+        try:
+            velas = _exchange_datos(ex_id).fetch_ohlcv(symbol, timeframe=timeframe, limit=limit)
+            if velas:
+                return velas, ex_id
+        except Exception as e:
+            ultimo_error = e
+            continue
+    raise ccxt.NetworkError(f"Ningún exchange respondió (último error: {ultimo_error})")
+
+
 # ── Análisis de noticias (más inteligente) ──────────────────────────────────
 def bajar_titulares(limite=14):
     titulares = []
@@ -395,6 +422,7 @@ class BotTrading:
         self.ganadoras = 0
         self.indicadores = {}
         self.historial = []            # últimos cierres, para el gráfico
+        self.fuente_datos = "—"        # de qué exchange salieron los datos
         self.tecnico = {"veredicto": "—", "motivos": []}
         self.noticias = {"veredicto": "—", "animo": 0, "confianza": 0,
                          "titulares": [], "resumen": "", "top_alcista": None, "top_bajista": None}
@@ -424,6 +452,7 @@ class BotTrading:
                 "ganadoras": self.ganadoras,
                 "win_rate": round(self.ganadoras / self.operaciones * 100, 1) if self.operaciones else 0,
                 "indicadores": self.indicadores, "historial": self.historial,
+                "fuente_datos": self.fuente_datos,
                 "tecnico": self.tecnico, "noticias": self.noticias,
                 "noticias_manual": self.noticias_manual, "noticias_fuente": self.noticias_fuente,
                 "cfg": self.cfg, "backtest": self.backtest,
@@ -526,12 +555,13 @@ class BotTrading:
         with self.lock:
             self.fase = "CARGANDO"
             self.pensamiento = "Cargando velas del mercado y titulares de noticias..."
-        velas = exchange.fetch_ohlcv(self.symbol, timeframe=TIMEFRAME, limit=120)
+        velas, fuente = bajar_velas(self.symbol, TIMEFRAME, 120)
         cierres = [v[4] for v in velas]
         precio = cierres[-1]
         with self.lock:
             self.precio = precio
             self.historial = [round(c, 2) for c in cierres[-60:]]
+            self.fuente_datos = fuente
 
         if time.time() - self._ultima_noticia > NOTICIAS_CADA or not self.noticias["titulares"]:
             noticias = analizar_noticias()
@@ -794,8 +824,7 @@ class Handler(BaseHTTPRequestHandler):
             self._json({"ok": True, "mensaje": "Resumen manual borrado"})
         elif self.path == "/backtest":
             try:
-                ex = bot.exchange or bot.crear_exchange()
-                velas = ex.fetch_ohlcv(SYMBOL, timeframe=TIMEFRAME, limit=1000)
+                velas, fuente = bajar_velas(SYMBOL, TIMEFRAME, 1000)
                 cierres = [v[4] for v in velas]
                 resultados = buscar_mejor_estrategia(cierres)
                 mejor = resultados[0]
@@ -805,10 +834,10 @@ class Handler(BaseHTTPRequestHandler):
                                "tp": mejor["tp"], "sl": mejor["sl"]}
                     bot.backtest = {"resultados": resultados, "hora": ahora(), "velas": len(cierres)}
                 bot.registrar("info",
-                    f"🔎 Backtest sobre {len(cierres)} velas: mejor estrategia "
+                    f"🔎 Backtest sobre {len(cierres)} velas ({fuente}): mejor estrategia "
                     f"'{mejor['nombre']}' ({mejor['retorno']:+.2f}%) — aplicada automáticamente.")
                 self._json({"ok": True, "resultados": resultados, "aplicada": bot.cfg,
-                            "velas": len(cierres)})
+                            "velas": len(cierres), "fuente": fuente})
             except Exception as e:
                 self._json({"ok": False, "mensaje": f"No se pudo correr el backtest: {e}"})
         else:

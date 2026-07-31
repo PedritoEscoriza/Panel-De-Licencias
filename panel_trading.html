@@ -366,7 +366,8 @@ async function actualizar() {
   badge.textContent = s.modo; badge.className = "modo-badge modo-" + s.modo;
   document.getElementById("warnReal").style.display = s.modo === "real" ? "block" : "none";
   document.getElementById("symbol").textContent = s.symbol;
-  document.getElementById("chartSymbol").textContent = s.symbol + " · " + (s.config ? s.config.timeframe : "");
+  document.getElementById("chartSymbol").textContent = s.symbol + " · " + (s.config ? s.config.timeframe : "") +
+    (s.fuente_datos && s.fuente_datos !== "—" ? " · datos: " + s.fuente_datos : "");
 
   document.querySelectorAll(".fase").forEach(f => f.classList.toggle("activa", f.dataset.fase === s.fase));
 
