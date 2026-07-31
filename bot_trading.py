@@ -23,7 +23,7 @@ Modos:
                Necesita BINANCE_TESTNET_API_KEY / _SECRET.
   • real     : Binance real (PLATA DE VERDAD). Activar a propósito.
 
-Panel:  http://localhost:5060
+Panel:  http://localhost:8000
 """
 
 from http.server import HTTPServer, BaseHTTPRequestHandler
@@ -52,7 +52,7 @@ TAKE_PROFIT = float(os.getenv("BOT_TAKE_PROFIT", "0.8"))
 STOP_LOSS   = float(os.getenv("BOT_STOP_LOSS", "1.0"))
 COMISION    = float(os.getenv("BOT_COMISION", "0.1"))
 
-PORT = int(os.getenv("BOT_PUERTO", "5060"))
+PORT = int(os.getenv("BOT_PUERTO", "8000"))  # 8000: puerto seguro para navegadores (5060 lo bloquean)
 
 # WhatsApp (reusa el Twilio que ya está en el proyecto)
 WHATSAPP_TO = os.getenv("BOT_WHATSAPP_TO", "")  # ej: +5491122334455

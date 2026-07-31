@@ -19,7 +19,7 @@ pip install -r requirements.txt
 python bot_trading.py
 ```
 
-Después abrí en el navegador: **http://localhost:5060**
+Después abrí en el navegador: **http://localhost:8000**
 
 - **▶ Encender** → arranca el ciclo (cargar → analizar → operar → repetir).
 - **■ Apagar** → detiene el bot y deja la posición como está.
