@@ -150,6 +150,22 @@
     <div class="pensamiento" id="pensamiento" style="margin-top:12px;">El bot está apagado.</div>
   </div>
 
+  <!-- Estrategia / backtest -->
+  <div class="box">
+    <h3>🔎 Estrategia activa: <span id="cfgNombre" style="text-transform:none;color:var(--txt);font-weight:400;">Clásica</span>
+      <button class="btn-chico btn-wa" style="background:var(--azul);color:#fff;" onclick="correrBacktest()">Buscar la mejor y aplicarla</button></h3>
+    <div id="btMsg" class="msg-envio"></div>
+    <div style="overflow-x:auto;">
+      <table id="btTabla" style="width:100%;border-collapse:collapse;font-size:13px;display:none;margin-top:8px;">
+        <thead><tr style="color:var(--muted);text-align:left;">
+          <th style="padding:6px 8px;">Estrategia</th><th>Retorno</th><th>Trades</th><th>% aciertos</th><th>Caída máx</th>
+        </tr></thead>
+        <tbody id="btBody"></tbody>
+      </table>
+    </div>
+    <div class="aviso">Prueba 6 estrategias sobre el histórico real de Binance y aplica la que mejor rindió. ⚠️ Rendir bien en el pasado NO garantiza el futuro.</div>
+  </div>
+
   <div class="cols">
     <div>
       <div class="box">
@@ -264,6 +280,32 @@ function copiarResumen() {
   document.getElementById("msgEnvio").style.color = "var(--muted)";
 }
 
+// ── Backtest: buscar la mejor estrategia y aplicarla ──
+async function correrBacktest() {
+  const msg = document.getElementById("btMsg");
+  msg.textContent = "⏳ Probando estrategias sobre el histórico real... (puede tardar unos segundos)";
+  msg.style.color = "var(--muted)";
+  try {
+    const r = await (await fetch(API + "/backtest", { method: "POST" })).json();
+    if (!r.ok) { msg.textContent = "⚠️ " + r.mensaje; msg.style.color = "var(--amarillo)"; return; }
+    msg.textContent = "✅ Aplicada la mejor: " + r.aplicada.nombre + " (probadas sobre " + r.velas + " velas reales).";
+    msg.style.color = "var(--verde)";
+    pintarBacktest(r.resultados);
+  } catch (e) { msg.textContent = "⚠️ Error de conexión."; msg.style.color = "var(--amarillo)"; }
+}
+function pintarBacktest(res) {
+  const tabla = document.getElementById("btTabla"), body = document.getElementById("btBody");
+  tabla.style.display = "table";
+  body.innerHTML = res.map((r, i) => {
+    const col = r.retorno >= 0 ? "var(--verde)" : "var(--rojo)";
+    const best = i === 0 ? "background:var(--panel2);font-weight:700;" : "";
+    return `<tr style="border-top:1px solid var(--border);${best}">
+      <td style="padding:6px 8px;">${i === 0 ? "🏆 " : ""}${r.nombre}</td>
+      <td style="color:${col};">${r.retorno >= 0 ? "+" : ""}${r.retorno}%</td>
+      <td>${r.trades}</td><td>${r.win_rate}%</td><td>${r.max_dd}%</td></tr>`;
+  }).join("");
+}
+
 // ── Análisis del profe (noticias manuales) ──
 async function cargarProfe() {
   const texto = document.getElementById("textoProfe").value.trim();
@@ -360,6 +402,13 @@ async function actualizar() {
   df.className = "decision-final d-" + String(s.decision || "default").replace(/\s/g, ".");
 
   document.getElementById("pensamiento").textContent = s.error ? "⚠️ " + s.error : s.pensamiento;
+
+  // Estrategia activa + tabla de backtest (si ya se corrió)
+  if (s.cfg) document.getElementById("cfgNombre").textContent =
+    s.cfg.nombre + " (EMA" + s.cfg.ema_r + "/" + s.cfg.ema_l + ", TP +" + s.cfg.tp + "% / SL -" + s.cfg.sl + "%)";
+  if (s.backtest && s.backtest.resultados && s.backtest.resultados.length &&
+      document.getElementById("btTabla").style.display === "none")
+    pintarBacktest(s.backtest.resultados);
 
   const mot = document.getElementById("motivos");
   if (s.tecnico && s.tecnico.motivos && s.tecnico.motivos.length)

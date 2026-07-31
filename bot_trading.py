@@ -285,6 +285,86 @@ def texto_resumen_mercado(noticias):
     return "\n".join(l for l in lineas if l is not None)
 
 
+# ── Backtesting: probar estrategias sobre datos históricos ──────────────────
+# Cada estrategia es una combinación de parámetros. El backtest las corre todas
+# sobre el histórico real y mide cuál habría rendido mejor.
+GRID_ESTRATEGIAS = [
+    {"nombre": "Scalping rápido",  "ema_r": 5,  "ema_l": 13, "rsi": 14, "tp": 0.4, "sl": 0.6},
+    {"nombre": "Clásica",          "ema_r": 9,  "ema_l": 21, "rsi": 14, "tp": 0.8, "sl": 1.0},
+    {"nombre": "Tendencia media",  "ema_r": 12, "ema_l": 26, "rsi": 14, "tp": 1.2, "sl": 1.5},
+    {"nombre": "Conservadora",     "ema_r": 9,  "ema_l": 21, "rsi": 14, "tp": 1.5, "sl": 1.0},
+    {"nombre": "Agresiva TP corto","ema_r": 5,  "ema_l": 13, "rsi": 14, "tp": 0.3, "sl": 0.5},
+    {"nombre": "Swing",            "ema_r": 20, "ema_l": 50, "rsi": 14, "tp": 2.0, "sl": 2.5},
+]
+
+
+def _veredicto_tecnico(er, el, r, hist):
+    """Misma lógica de confluencia que usa el bot en vivo (para el backtest)."""
+    puntos = 0
+    puntos += 1 if er > el else -1
+    if r > 70 or r < 30:
+        puntos -= 1
+    elif r > 50:
+        puntos += 1
+    puntos += 1 if hist > 0 else -1
+    return "ALCISTA" if puntos >= 2 else "BAJISTA" if puntos <= -1 else "NEUTRAL"
+
+
+def simular_estrategia(cierres, cfg, comision=COMISION, riesgo=20.0):
+    """Corre una estrategia sobre el histórico y devuelve sus métricas."""
+    capital = 1000.0
+    pos = None
+    trades, wins = [], 0
+    peak, max_dd = capital, 0.0
+    minreq = max(cfg["ema_l"], cfg["rsi"], 35) + 2
+    for i in range(minreq, len(cierres)):
+        ventana = cierres[:i + 1]
+        precio = ventana[-1]
+        er = ema(ventana, cfg["ema_r"]); el = ema(ventana, cfg["ema_l"])
+        r = rsi(ventana, cfg["rsi"]); _, _, hist = macd(ventana)
+        if None in (er, el, r, hist):
+            continue
+        ver = _veredicto_tecnico(er, el, r, hist)
+        if pos is None:
+            if ver == "ALCISTA":
+                monto = capital * (riesgo / 100); com = monto * comision / 100
+                pos = {"entrada": precio, "cant": monto / precio}
+                capital -= (monto + com)
+        else:
+            cambio = (precio - pos["entrada"]) / pos["entrada"] * 100
+            if cambio >= cfg["tp"] or cambio <= -cfg["sl"] or ver == "BAJISTA":
+                vv = pos["cant"] * precio; com = vv * comision / 100
+                gan = (precio - pos["entrada"]) * pos["cant"] - com
+                capital += (vv - com); trades.append(gan)
+                if gan > 0:
+                    wins += 1
+                pos = None
+        eq = capital + (pos["cant"] * precio if pos else 0)
+        peak = max(peak, eq)
+        max_dd = max(max_dd, (peak - eq) / peak * 100 if peak else 0)
+    if pos:  # cerrar lo que quede abierto al final
+        vv = pos["cant"] * cierres[-1]; com = vv * comision / 100
+        gan = (cierres[-1] - pos["entrada"]) * pos["cant"] - com
+        capital += (vv - com); trades.append(gan)
+        if gan > 0:
+            wins += 1
+    n = len(trades)
+    return {"retorno": round((capital - 1000.0) / 1000.0 * 100, 2), "trades": n,
+            "ganadoras": wins, "win_rate": round(wins / n * 100, 1) if n else 0,
+            "max_dd": round(max_dd, 2)}
+
+
+def buscar_mejor_estrategia(cierres):
+    """Prueba todas las estrategias del grid y las ordena por resultado."""
+    resultados = []
+    for cfg in GRID_ESTRATEGIAS:
+        m = simular_estrategia(cierres, cfg)
+        resultados.append({**cfg, **m})
+    # Ordena por retorno, pero exige al menos 3 operaciones para ser confiable
+    resultados.sort(key=lambda r: (r["trades"] >= 3, r["retorno"]), reverse=True)
+    return resultados
+
+
 # ── El bot ──────────────────────────────────────────────────────────────────
 class BotTrading:
     def __init__(self):
@@ -292,10 +372,14 @@ class BotTrading:
         self.hilo = None
         self.encendido = False
         self.exchange = None
-        # El resumen manual (del profe) persiste aunque prendas/apagues el bot
+        # El resumen manual persiste aunque prendas/apagues el bot
         self.noticias_manual = {"activo": False, "texto": "", "veredicto": "—",
                                 "animo": 0, "bias": "auto", "hora": ""}
-        self.noticias_fuente = "auto"   # "auto" (RSS) o "manual" (profe)
+        self.noticias_fuente = "auto"   # "auto" (RSS) o "manual"
+        # Estrategia activa (la puede cambiar el backtest). También persiste.
+        self.cfg = {"nombre": "Clásica", "ema_r": EMA_RAPIDA, "ema_l": EMA_LENTA,
+                    "rsi": RSI_PERIODO, "tp": TAKE_PROFIT, "sl": STOP_LOSS}
+        self.backtest = {"resultados": [], "hora": "", "velas": 0}
         self.reset_estado()
 
     def reset_estado(self):
@@ -342,6 +426,7 @@ class BotTrading:
                 "indicadores": self.indicadores, "historial": self.historial,
                 "tecnico": self.tecnico, "noticias": self.noticias,
                 "noticias_manual": self.noticias_manual, "noticias_fuente": self.noticias_fuente,
+                "cfg": self.cfg, "backtest": self.backtest,
                 "decision": self.decision, "pensamiento": self.pensamiento,
                 "log": self.log, "error": self.error,
                 "config": {"timeframe": TIMEFRAME, "intervalo": INTERVALO,
@@ -474,9 +559,10 @@ class BotTrading:
         self.decidir(precio, tecnico["veredicto"], veredicto_noticias)
 
     def analizar_tecnico(self, cierres):
-        ema_r = ema(cierres, EMA_RAPIDA)
-        ema_l = ema(cierres, EMA_LENTA)
-        rsi_v = rsi(cierres, RSI_PERIODO)
+        cfg = self.cfg
+        ema_r = ema(cierres, cfg["ema_r"])
+        ema_l = ema(cierres, cfg["ema_l"])
+        rsi_v = rsi(cierres, cfg["rsi"])
         macd_l, signal_l, hist = macd(cierres)
         with self.lock:
             self.indicadores = {
@@ -489,9 +575,9 @@ class BotTrading:
 
         puntos, motivos = 0, []
         if ema_r > ema_l:
-            puntos += 1; motivos.append(f"EMA{EMA_RAPIDA} > EMA{EMA_LENTA} (tendencia alcista)")
+            puntos += 1; motivos.append(f"EMA{cfg['ema_r']} > EMA{cfg['ema_l']} (tendencia alcista)")
         else:
-            puntos -= 1; motivos.append(f"EMA{EMA_RAPIDA} < EMA{EMA_LENTA} (tendencia bajista)")
+            puntos -= 1; motivos.append(f"EMA{cfg['ema_r']} < EMA{cfg['ema_l']} (tendencia bajista)")
         if rsi_v > 70:
             puntos -= 1; motivos.append(f"RSI {rsi_v} sobrecomprado (riesgo de caída)")
         elif rsi_v < 30:
@@ -569,15 +655,16 @@ class BotTrading:
             f"(-${comision:.2f} comisión) — {razon}.")
 
     def gestionar_posicion(self, precio, tec, noti):
+        tp, sl = self.cfg["tp"], self.cfg["sl"]
         entrada = self.posicion["precio_entrada"]
         cambio_pct = (precio - entrada) / entrada * 100
         with self.lock:
             self.decision = "EN POSICIÓN"
             self.pensamiento = (f"Posición abierta desde ${entrada:,.2f}, ahora {cambio_pct:+.2f}%. "
-                                f"Objetivo +{TAKE_PROFIT}% / corte -{STOP_LOSS}%.")
-        if cambio_pct >= TAKE_PROFIT:
+                                f"Objetivo +{tp}% / corte -{sl}%.")
+        if cambio_pct >= tp:
             self.cerrar_posicion(f"llegó al objetivo de ganancia (+{cambio_pct:.2f}%)", precio)
-        elif cambio_pct <= -STOP_LOSS:
+        elif cambio_pct <= -sl:
             self.cerrar_posicion(f"tocó el stop loss ({cambio_pct:.2f}%)", precio)
         elif tec == "BAJISTA" or noti == "BAJISTA":
             quien = "el técnico" if tec == "BAJISTA" else "las noticias"
@@ -705,6 +792,25 @@ class Handler(BaseHTTPRequestHandler):
                 bot.noticias_fuente = "auto"
             bot.registrar("info", "📥 Información borrada → vuelve a noticias automáticas.")
             self._json({"ok": True, "mensaje": "Resumen manual borrado"})
+        elif self.path == "/backtest":
+            try:
+                ex = bot.exchange or bot.crear_exchange()
+                velas = ex.fetch_ohlcv(SYMBOL, timeframe=TIMEFRAME, limit=1000)
+                cierres = [v[4] for v in velas]
+                resultados = buscar_mejor_estrategia(cierres)
+                mejor = resultados[0]
+                with bot.lock:
+                    bot.cfg = {"nombre": mejor["nombre"], "ema_r": mejor["ema_r"],
+                               "ema_l": mejor["ema_l"], "rsi": mejor["rsi"],
+                               "tp": mejor["tp"], "sl": mejor["sl"]}
+                    bot.backtest = {"resultados": resultados, "hora": ahora(), "velas": len(cierres)}
+                bot.registrar("info",
+                    f"🔎 Backtest sobre {len(cierres)} velas: mejor estrategia "
+                    f"'{mejor['nombre']}' ({mejor['retorno']:+.2f}%) — aplicada automáticamente.")
+                self._json({"ok": True, "resultados": resultados, "aplicada": bot.cfg,
+                            "velas": len(cierres)})
+            except Exception as e:
+                self._json({"ok": False, "mensaje": f"No se pudo correr el backtest: {e}"})
         else:
             self.send_response(404); self.end_headers()
 
