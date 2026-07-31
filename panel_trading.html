@@ -33,7 +33,7 @@
     height: 2px; background: var(--azul); border-radius: 2px; }
   .fase .n { font-size: 11px; opacity: .6; }
 
-  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 20px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 16px; }
   .card { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
   .card .label { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
   .card .valor { font-size: 22px; font-weight: 700; }
@@ -43,47 +43,59 @@
   @media (max-width: 780px) { .cols { grid-template-columns: 1fr; } }
 
   .box { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
-  .box h3 { font-size: 14px; margin-bottom: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
+  .box h3 { font-size: 14px; margin-bottom: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px;
+    display: flex; justify-content: space-between; align-items: center; }
 
-  /* Confluencia técnico + noticias */
+  /* Gráfico */
+  #chart { width: 100%; height: 160px; display: block; }
+  .chart-info { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); margin-top: 6px; }
+
+  /* Confluencia */
   .confluencia { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
   .veredicto { text-align: center; padding: 14px; border-radius: 10px; background: var(--panel2); border: 1px solid var(--border); }
   .veredicto .tit { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px; }
   .veredicto .val { font-size: 20px; font-weight: 800; }
+  .veredicto .sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
   .v-ALCISTA { color: var(--verde); } .v-BAJISTA { color: var(--rojo); }
   .v-NEUTRAL, .v-SINDATOS { color: var(--muted); }
-  .decision-final { text-align: center; padding: 14px; border-radius: 10px; font-size: 18px; font-weight: 800;
-    border: 1px solid var(--border); }
+  .decision-final { text-align: center; padding: 14px; border-radius: 10px; font-size: 18px; font-weight: 800; border: 1px solid var(--border); }
   .d-COMPRAR, .d-EN.POSICION { background: #0f2f22; color: var(--verde); border-color: var(--verde); }
   .d-VENDER { background: #3a2b06; color: var(--amarillo); border-color: var(--amarillo); }
   .d-NO.OPERAR, .d-default { background: var(--panel2); color: var(--muted); }
 
-  .pensamiento { background: var(--panel2); border-left: 3px solid var(--azul); border-radius: 8px;
-    padding: 14px; font-size: 15px; min-height: 60px; }
+  /* Barra de ánimo del mercado */
+  .animo-bar { height: 10px; border-radius: 6px; background: linear-gradient(90deg, var(--rojo), #555 50%, var(--verde));
+    position: relative; margin: 10px 0 4px; }
+  .animo-marker { position: absolute; top: -3px; width: 4px; height: 16px; background: #fff; border-radius: 2px; transform: translateX(-50%); transition: left .4s; }
 
+  .pensamiento { background: var(--panel2); border-left: 3px solid var(--azul); border-radius: 8px; padding: 14px; font-size: 15px; min-height: 60px; }
   .motivos { list-style: none; font-size: 13px; }
   .motivos li { padding: 5px 0; border-bottom: 1px solid var(--border); color: var(--muted); }
   .motivos li:last-child { border-bottom: none; }
-
   .ind { display: flex; justify-content: space-between; padding: 7px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
   .ind:last-child { border-bottom: none; } .ind .k { color: var(--muted); }
 
-  .titulares { max-height: 260px; overflow-y: auto; font-size: 13px; }
-  .titular { padding: 8px 10px; border-radius: 6px; margin-bottom: 4px; background: var(--panel2);
-    border-left: 3px solid var(--muted); }
+  .titulares { max-height: 220px; overflow-y: auto; font-size: 13px; }
+  .titular { padding: 8px 10px; border-radius: 6px; margin-bottom: 4px; background: var(--panel2); border-left: 3px solid var(--muted); }
   .t-alcista { border-left-color: var(--verde); } .t-bajista { border-left-color: var(--rojo); }
 
-  .log { max-height: 300px; overflow-y: auto; font-size: 13px; }
+  .log { max-height: 260px; overflow-y: auto; font-size: 13px; }
   .log-item { padding: 8px 10px; border-radius: 6px; margin-bottom: 4px; background: var(--panel2); }
   .log-item .hora { color: var(--muted); font-size: 11px; margin-right: 8px; }
-  .log-compra { border-left: 3px solid var(--verde); }
-  .log-venta  { border-left: 3px solid var(--amarillo); }
-  .log-error  { border-left: 3px solid var(--rojo); }
-  .log-info   { border-left: 3px solid var(--azul); }
+  .log-compra { border-left: 3px solid var(--verde); } .log-venta { border-left: 3px solid var(--amarillo); }
+  .log-error { border-left: 3px solid var(--rojo); } .log-info { border-left: 3px solid var(--azul); }
+
+  .resumen-txt { background: var(--panel2); border-radius: 8px; padding: 14px; font-size: 14px; white-space: pre-wrap;
+    max-height: 220px; overflow-y: auto; line-height: 1.6; }
+  .fila { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+  input[type=text] { flex: 1; min-width: 140px; background: var(--panel2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 10px 12px; color: var(--txt); font-size: 14px; }
+  .btn-chico { padding: 10px 16px; font-size: 14px; border-radius: 8px; }
+  .btn-wa { background: #25d366; color: #062b16; } .btn-sec { background: var(--panel2); color: var(--txt); border: 1px solid var(--border); }
+  .msg-envio { font-size: 13px; margin-top: 8px; color: var(--muted); }
 
   .controles { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
-  button { border: none; border-radius: 10px; padding: 14px 28px; font-size: 16px; font-weight: 700;
-    cursor: pointer; transition: transform .1s, opacity .2s; }
+  button { border: none; border-radius: 10px; padding: 14px 28px; font-size: 16px; font-weight: 700; cursor: pointer; transition: transform .1s, opacity .2s; }
   button:active { transform: scale(.97); } button:disabled { opacity: .4; cursor: not-allowed; }
   .btn-on { background: var(--verde); color: #041b12; }
   .btn-off { background: var(--rojo); color: #fff; }
@@ -120,12 +132,19 @@
     <div class="card"><div class="label">% aciertos</div><div class="valor" id="winrate">—</div></div>
   </div>
 
-  <!-- Confluencia: técnico + noticias + decisión -->
+  <!-- Gráfico de precio -->
+  <div class="box">
+    <h3>📉 Precio <span id="chartSymbol" style="text-transform:none;font-weight:400;"></span></h3>
+    <canvas id="chart"></canvas>
+    <div class="chart-info"><span id="chartMin">—</span><span id="chartMax">—</span></div>
+  </div>
+
+  <!-- Decisión -->
   <div class="box">
     <h3>🎯 Decisión (opera solo si coinciden)</h3>
     <div class="confluencia">
       <div class="veredicto"><div class="tit">📈 Análisis técnico</div><div class="val" id="vTec">—</div></div>
-      <div class="veredicto"><div class="tit">📰 Noticias</div><div class="val" id="vNoti">—</div></div>
+      <div class="veredicto"><div class="tit">📰 Noticias</div><div class="val" id="vNoti">—</div><div class="sub" id="vNotiSub"></div></div>
     </div>
     <div class="decision-final d-default" id="decisionFinal">—</div>
     <div class="pensamiento" id="pensamiento" style="margin-top:12px;">El bot está apagado.</div>
@@ -151,10 +170,23 @@
     </div>
 
     <div>
+      <!-- Resumen del mercado + enviar al chat -->
       <div class="box">
-        <h3>📰 Titulares analizados <span id="notiResumen" style="text-transform:none;font-weight:400;"></span></h3>
+        <h3>🌍 Resumen del mercado <button class="btn-chico btn-sec" onclick="cargarResumen()">↻ Actualizar</button></h3>
+        <div class="resumen-txt" id="resumenTxt">Tocá "Actualizar" para generar el resumen.</div>
+        <div class="fila">
+          <input type="text" id="destino" placeholder="Tu WhatsApp (ej: +5491122334455)">
+          <button class="btn-chico btn-wa" onclick="enviarResumen()">📤 Enviar al WhatsApp</button>
+          <button class="btn-chico btn-sec" onclick="copiarResumen()">📋 Copiar</button>
+        </div>
+        <div class="msg-envio" id="msgEnvio"></div>
+      </div>
+
+      <div class="box">
+        <h3>📰 Titulares <span id="notiResumen" style="text-transform:none;font-weight:400;"></span></h3>
         <div class="titulares" id="titulares"><div style="color:var(--muted)">Sin noticias todavía.</div></div>
       </div>
+
       <div class="box">
         <h3>📜 Registro en vivo</h3>
         <div class="log" id="log"><div style="color:var(--muted)">Sin actividad todavía.</div></div>
@@ -169,10 +201,7 @@
       <button id="btnOff" class="btn-off" onclick="apagar(false)" disabled>■ Apagar</button>
       <button id="btnPanico" class="btn-panico" onclick="apagar(true)" disabled>🛑 Apagar y cerrar todo</button>
     </div>
-    <div class="aviso">
-      Solo tenés que prenderlo. El bot carga mercado + noticias, analiza los dos, y opera
-      únicamente cuando el técnico y las noticias coinciden. "Apagar y cerrar todo" es el botón de pánico.
-    </div>
+    <div class="aviso">Solo tenés que prenderlo. Carga mercado + noticias, analiza los dos, y opera solo cuando coinciden.</div>
   </div>
 
 </div>
@@ -180,16 +209,66 @@
 <script>
 const API = location.origin;
 async function encender() { await fetch(API + "/encender", { method: "POST" }); actualizar(); }
-async function apagar(cerrarTodo) {
-  await fetch(API + "/apagar", { method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ cerrar_todo: cerrarTodo }) });
-  actualizar();
-}
-function fmt(n, dec = 2) {
-  if (n === null || n === undefined) return "—";
-  return Number(n).toLocaleString("es-AR", { minimumFractionDigits: dec, maximumFractionDigits: dec });
-}
+async function apagar(c) { await fetch(API + "/apagar", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cerrar_todo: c }) }); actualizar(); }
+function fmt(n, dec = 2) { if (n === null || n === undefined) return "—"; return Number(n).toLocaleString("es-AR", { minimumFractionDigits: dec, maximumFractionDigits: dec }); }
 function claseVer(v) { return "val v-" + String(v).replace(/\s/g, ""); }
+
+// ── Resumen del mercado ──
+let ultimoResumen = "";
+async function cargarResumen() {
+  document.getElementById("resumenTxt").textContent = "Generando resumen...";
+  try {
+    const r = await (await fetch(API + "/resumen")).json();
+    ultimoResumen = r.texto;
+    document.getElementById("resumenTxt").textContent = r.texto;
+  } catch (e) { document.getElementById("resumenTxt").textContent = "No se pudo generar el resumen."; }
+}
+async function enviarResumen() {
+  const destino = document.getElementById("destino").value.trim();
+  const msg = document.getElementById("msgEnvio");
+  msg.textContent = "Enviando...";
+  try {
+    const r = await (await fetch(API + "/enviar_resumen", { method: "POST",
+      headers: { "Content-Type": "application/json" }, body: JSON.stringify({ destino }) })).json();
+    ultimoResumen = r.texto || ultimoResumen;
+    document.getElementById("resumenTxt").textContent = ultimoResumen;
+    msg.textContent = (r.ok ? "✅ " : "⚠️ ") + r.mensaje;
+    msg.style.color = r.ok ? "var(--verde)" : "var(--amarillo)";
+  } catch (e) { msg.textContent = "⚠️ Error de conexión."; }
+}
+function copiarResumen() {
+  if (!ultimoResumen) return;
+  navigator.clipboard.writeText(ultimoResumen);
+  document.getElementById("msgEnvio").textContent = "📋 Copiado al portapapeles.";
+  document.getElementById("msgEnvio").style.color = "var(--muted)";
+}
+
+// ── Gráfico de precio (canvas, sin librerías) ──
+function dibujarChart(datos) {
+  const c = document.getElementById("chart");
+  const dpr = window.devicePixelRatio || 1;
+  const w = c.clientWidth, h = 160;
+  c.width = w * dpr; c.height = h * dpr;
+  const ctx = c.getContext("2d"); ctx.scale(dpr, dpr);
+  ctx.clearRect(0, 0, w, h);
+  if (!datos || datos.length < 2) return;
+  const min = Math.min(...datos), max = Math.max(...datos), rango = (max - min) || 1;
+  const px = i => (i / (datos.length - 1)) * (w - 8) + 4;
+  const py = v => h - 8 - ((v - min) / rango) * (h - 16);
+  const sube = datos[datos.length - 1] >= datos[0];
+  const color = sube ? "#16c784" : "#ea3943";
+  // área
+  ctx.beginPath(); ctx.moveTo(px(0), py(datos[0]));
+  datos.forEach((v, i) => ctx.lineTo(px(i), py(v)));
+  ctx.lineTo(px(datos.length - 1), h); ctx.lineTo(px(0), h); ctx.closePath();
+  ctx.fillStyle = sube ? "rgba(22,199,132,.12)" : "rgba(234,57,67,.12)"; ctx.fill();
+  // línea
+  ctx.beginPath(); ctx.moveTo(px(0), py(datos[0]));
+  datos.forEach((v, i) => ctx.lineTo(px(i), py(v)));
+  ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.stroke();
+  document.getElementById("chartMin").textContent = "mín $" + fmt(min);
+  document.getElementById("chartMax").textContent = "máx $" + fmt(max);
+}
 
 async function actualizar() {
   let s;
@@ -199,6 +278,7 @@ async function actualizar() {
   badge.textContent = s.modo; badge.className = "modo-badge modo-" + s.modo;
   document.getElementById("warnReal").style.display = s.modo === "real" ? "block" : "none";
   document.getElementById("symbol").textContent = s.symbol;
+  document.getElementById("chartSymbol").textContent = s.symbol + " · " + (s.config ? s.config.timeframe : "");
 
   document.querySelectorAll(".fase").forEach(f => f.classList.toggle("activa", f.dataset.fase === s.fase));
 
@@ -211,26 +291,24 @@ async function actualizar() {
   document.getElementById("ops").textContent = s.operaciones + " (" + s.ganadoras + " ✓)";
   document.getElementById("winrate").textContent = s.operaciones ? s.win_rate + "%" : "—";
 
-  // Veredictos
+  dibujarChart(s.historial);
+
   const tec = (s.tecnico && s.tecnico.veredicto) || "—";
   const noti = (s.noticias && s.noticias.veredicto) || "—";
   const vTec = document.getElementById("vTec"); vTec.textContent = tec; vTec.className = claseVer(tec);
   const vNoti = document.getElementById("vNoti"); vNoti.textContent = noti; vNoti.className = claseVer(noti);
+  document.getElementById("vNotiSub").textContent = s.noticias && s.noticias.animo !== undefined ? ("ánimo " + (s.noticias.animo >= 0 ? "+" : "") + s.noticias.animo + "/100") : "";
 
-  // Decisión final
   const df = document.getElementById("decisionFinal");
   df.textContent = s.decision || "—";
   df.className = "decision-final d-" + String(s.decision || "default").replace(/\s/g, ".");
 
   document.getElementById("pensamiento").textContent = s.error ? "⚠️ " + s.error : s.pensamiento;
 
-  // Motivos técnicos
   const mot = document.getElementById("motivos");
-  if (s.tecnico && s.tecnico.motivos && s.tecnico.motivos.length) {
+  if (s.tecnico && s.tecnico.motivos && s.tecnico.motivos.length)
     mot.innerHTML = s.tecnico.motivos.map(m => `<li>• ${m}</li>`).join("");
-  }
 
-  // Posición
   const pos = document.getElementById("posicion");
   if (s.posicion) {
     const p = s.posicion;
@@ -241,30 +319,22 @@ async function actualizar() {
     pos.style.color = "var(--txt)";
   } else { pos.textContent = "Ninguna posición abierta."; pos.style.color = "var(--muted)"; }
 
-  // Indicadores
   const ind = s.indicadores || {};
   document.getElementById("emaR").textContent = ind.ema_rapida ? "$" + fmt(ind.ema_rapida) : "—";
   document.getElementById("emaL").textContent = ind.ema_lenta ? "$" + fmt(ind.ema_lenta) : "—";
   const rsiEl = document.getElementById("rsi");
-  if (ind.rsi != null) { rsiEl.textContent = ind.rsi; rsiEl.className = ind.rsi > 70 ? "rojo" : ind.rsi < 30 ? "verde" : ""; }
-  else rsiEl.textContent = "—";
+  if (ind.rsi != null) { rsiEl.textContent = ind.rsi; rsiEl.className = ind.rsi > 70 ? "rojo" : ind.rsi < 30 ? "verde" : ""; } else rsiEl.textContent = "—";
   const macdEl = document.getElementById("macd");
-  if (ind.macd_hist != null) { macdEl.textContent = ind.macd_hist; macdEl.className = ind.macd_hist >= 0 ? "verde" : "rojo"; }
-  else macdEl.textContent = "—";
+  if (ind.macd_hist != null) { macdEl.textContent = ind.macd_hist; macdEl.className = ind.macd_hist >= 0 ? "verde" : "rojo"; } else macdEl.textContent = "—";
 
-  // Titulares
   document.getElementById("notiResumen").textContent = s.noticias && s.noticias.resumen ? "— " + s.noticias.resumen : "";
   const tit = document.getElementById("titulares");
-  if (s.noticias && s.noticias.titulares && s.noticias.titulares.length) {
-    tit.innerHTML = s.noticias.titulares.map(t =>
-      `<div class="titular t-${t.sent}">${t.titulo}</div>`).join("");
-  }
+  if (s.noticias && s.noticias.titulares && s.noticias.titulares.length)
+    tit.innerHTML = s.noticias.titulares.map(t => `<div class="titular t-${t.sent}">${t.titulo}</div>`).join("");
 
-  // Log
   const log = document.getElementById("log");
-  if (s.log && s.log.length) {
+  if (s.log && s.log.length)
     log.innerHTML = s.log.map(l => `<div class="log-item log-${l.tipo}"><span class="hora">${l.hora}</span>${l.texto}</div>`).join("");
-  }
 
   const dot = document.getElementById("dot");
   dot.className = "estado-dot " + (s.encendido ? "on" : "off");

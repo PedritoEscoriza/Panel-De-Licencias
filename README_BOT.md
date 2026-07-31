@@ -44,6 +44,17 @@ Después abrí en el navegador: **http://localhost:5060**
 
 Se cambian en el `.env` (mirá `.env.example`).
 
+**En simulado** las órdenes se simulan en memoria. **En testnet y real** el bot
+manda órdenes de mercado **de verdad** vía ccxt (`create_market_order`) y arranca
+leyendo tu **balance real** de USDT. Para testnet:
+
+1. Creá tus keys gratis en https://testnet.binance.vision
+2. Ponelas en el `.env` (`BINANCE_TESTNET_API_KEY` / `_SECRET`)
+3. `BOT_MODO=testnet`
+
+> Creá siempre las API keys **sin permiso de retiro**. El modo `real` opera con
+> plata de verdad — no lo actives hasta haber probado mucho en testnet.
+
 ## La estrategia: técnico + noticias (opera solo si coinciden)
 
 El bot corre **dos análisis** en cada vuelta y **solo compra si los dos están
@@ -58,8 +69,24 @@ claro, se queda quieto.
 Con eso da un veredicto: **ALCISTA / BAJISTA / NEUTRAL**.
 
 **2. Análisis de noticias** — baja titulares recientes de cripto (CoinTelegraph,
-CoinDesk, CryptoPotato vía RSS, sin API key) y mide el **sentimiento** contando
-palabras alcistas vs bajistas. Da otro veredicto: **ALCISTA / BAJISTA / NEUTRAL**.
+CoinDesk, CryptoPotato vía RSS, sin API key) y mide el **sentimiento**. No es un
+conteo plano: usa **pesos por intensidad** (no es lo mismo "crash" que "dips"),
+detecta **frases** de varias palabras ("record high", "sell-off") y maneja
+**negaciones** ("not bullish" cuenta como bajista). Con eso arma un **ánimo del
+mercado de -100 a +100** y un veredicto: **ALCISTA / BAJISTA / NEUTRAL**.
+
+## 🌍 Resumen del mercado a tu WhatsApp
+
+En el panel hay una sección **"Resumen del mercado"** que arma un digest del
+clima general (ánimo, lo más positivo y lo más negativo del día) y te deja:
+- **📤 Enviarlo a tu WhatsApp** (reusa el Twilio que ya está en el proyecto —
+  poné tu número en el panel o en `BOT_WHATSAPP_TO` del `.env`).
+- **📋 Copiarlo** al portapapeles.
+
+## 📉 Gráfico de precio
+
+El panel dibuja en vivo un gráfico del precio (últimas ~60 velas), en verde o
+rojo según la dirección. Sin librerías externas, todo dentro del mismo archivo.
 
 **3. Decisión** — la regla de oro:
 

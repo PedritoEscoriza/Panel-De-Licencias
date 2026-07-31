@@ -8,17 +8,19 @@ el bot se configura todo solo. Cuando lo encendés, en cada vuelta hace:
   1) CARGA   → baja velas del mercado + titulares de noticias de cripto
   2) ANALIZA → corre DOS análisis en paralelo:
         • Técnico  : confluencia de EMA + RSI + MACD sobre el precio
-        • Noticias : mide el sentimiento (alcista/bajista) de los titulares
+        • Noticias : mide el sentimiento (alcista/bajista) de los titulares,
+                     con pesos por intensidad, frases y negaciones
   3) DECIDE  → SOLO opera si los dos coinciden y NO se contradicen.
-               Si el técnico dice una cosa y las noticias la contraria,
-               o si alguno no está claro → se queda QUIETO.
 
 El análisis corre en loop mientras el bot está encendido (no es una foto).
 
-Modos (bien visibles en el panel):
-  • simulado : precios y noticias REALES, pero órdenes FALSAS. Sin API keys.
-               Es el modo por defecto y el más seguro. Empezá siempre acá.
-  • testnet  : Binance Testnet (plata de mentira, necesita keys de testnet).
+Además: podés pedir un RESUMEN del mercado y enviártelo al WhatsApp
+(reusa las credenciales de Twilio que ya tenés en el .env).
+
+Modos:
+  • simulado : precios y noticias REALES, órdenes FALSAS. Sin API keys. (por defecto)
+  • testnet  : Binance Testnet, manda órdenes REALES con plata de mentira.
+               Necesita BINANCE_TESTNET_API_KEY / _SECRET.
   • real     : Binance real (PLATA DE VERDAD). Activar a propósito.
 
 Panel:  http://localhost:5060
@@ -26,7 +28,7 @@ Panel:  http://localhost:5060
 
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from dotenv import load_dotenv
-import json, os, threading, time, traceback, urllib.request
+import json, os, threading, time, traceback, urllib.request, re
 from datetime import datetime, timezone
 from xml.etree import ElementTree as ET
 
@@ -38,45 +40,59 @@ load_dotenv()
 MODO        = os.getenv("BOT_MODO", "simulado").lower()   # simulado | testnet | real
 SYMBOL      = os.getenv("BOT_SYMBOL", "BTC/USDT")
 TIMEFRAME   = os.getenv("BOT_TIMEFRAME", "5m")
-INTERVALO   = int(os.getenv("BOT_INTERVALO", "15"))       # segundos entre análisis
-CAPITAL_INI = float(os.getenv("BOT_CAPITAL", "1000"))     # capital simulado (USDT)
-RIESGO_PCT  = float(os.getenv("BOT_RIESGO_PCT", "20"))    # % del capital por operación
-NOTICIAS_CADA = int(os.getenv("BOT_NOTICIAS_CADA", "300"))  # refrescar noticias cada X seg
+INTERVALO   = int(os.getenv("BOT_INTERVALO", "15"))
+CAPITAL_INI = float(os.getenv("BOT_CAPITAL", "1000"))
+RIESGO_PCT  = float(os.getenv("BOT_RIESGO_PCT", "20"))
+NOTICIAS_CADA = int(os.getenv("BOT_NOTICIAS_CADA", "300"))
 
-# Estrategia técnica
 EMA_RAPIDA  = int(os.getenv("BOT_EMA_RAPIDA", "9"))
 EMA_LENTA   = int(os.getenv("BOT_EMA_LENTA", "21"))
 RSI_PERIODO = int(os.getenv("BOT_RSI_PERIODO", "14"))
-TAKE_PROFIT = float(os.getenv("BOT_TAKE_PROFIT", "0.8"))  # % ganancia objetivo
-STOP_LOSS   = float(os.getenv("BOT_STOP_LOSS", "1.0"))    # % pérdida máxima
-COMISION    = float(os.getenv("BOT_COMISION", "0.1"))     # % por operación
+TAKE_PROFIT = float(os.getenv("BOT_TAKE_PROFIT", "0.8"))
+STOP_LOSS   = float(os.getenv("BOT_STOP_LOSS", "1.0"))
+COMISION    = float(os.getenv("BOT_COMISION", "0.1"))
 
 PORT = int(os.getenv("BOT_PUERTO", "5060"))
 
-# Fuentes de noticias (RSS público, sin API key)
+# WhatsApp (reusa el Twilio que ya está en el proyecto)
+WHATSAPP_TO = os.getenv("BOT_WHATSAPP_TO", "")  # ej: +5491122334455
+
 FEEDS = [
     "https://cointelegraph.com/rss",
     "https://www.coindesk.com/arc/outboundfeeds/rss/",
     "https://cryptopotato.com/feed/",
 ]
 
-# Léxico de sentimiento (las noticias suelen estar en inglés)
-PALABRAS_ALCISTAS = {
-    "surge", "surges", "rally", "rallies", "soar", "soars", "gains", "gain",
-    "bull", "bullish", "breakout", "adoption", "approval", "approved", "etf",
-    "record", "high", "jump", "jumps", "rise", "rises", "climb", "climbs",
-    "upgrade", "partnership", "institutional", "buy", "buying", "accumulate",
-    "recovery", "rebound", "boom", "optimism", "greed", "inflow", "inflows",
-    "milestone", "support", "positive", "outperform", "surge",
+# Léxico con PESOS por intensidad. Frases de varias palabras van aparte.
+FRASES = {
+    "all-time high": 3, "all time high": 3, "record high": 3, "record highs": 3,
+    "etf approval": 3, "etf approved": 3, "bull market": 2, "bull run": 2,
+    "sell-off": -2, "sell off": -2, "bear market": -2, "death cross": -2,
+    "golden cross": 2, "short squeeze": 2,
 }
-PALABRAS_BAJISTAS = {
-    "crash", "crashes", "plunge", "plunges", "dump", "dumps", "drop", "drops",
-    "fall", "falls", "bear", "bearish", "selloff", "sell-off", "hack", "hacked",
-    "exploit", "ban", "banned", "lawsuit", "charges", "decline", "declines",
-    "fear", "liquidation", "liquidations", "collapse", "warning", "fraud",
-    "scam", "tumble", "slump", "downgrade", "fine", "crackdown", "outflow",
-    "outflows", "sell", "selling", "loss", "losses", "negative", "risk", "crisis",
+PALABRAS = {
+    # alcistas fuertes (+2/+3)
+    "surge": 2, "surges": 2, "soar": 2, "soars": 2, "rally": 2, "rallies": 2,
+    "breakout": 2, "bullish": 2, "adoption": 2, "institutional": 2, "inflows": 2,
+    "inflow": 2, "approved": 2, "approval": 2, "boom": 2, "moon": 2,
+    # alcistas leves (+1)
+    "gains": 1, "gain": 1, "rise": 1, "rises": 1, "climb": 1, "climbs": 1,
+    "jump": 1, "jumps": 1, "recovery": 1, "rebound": 1, "partnership": 1,
+    "upgrade": 1, "optimism": 1, "buy": 1, "buying": 1, "accumulate": 1,
+    "support": 1, "milestone": 1, "positive": 1, "outperform": 1, "green": 1,
+    # bajistas fuertes (-2/-3)
+    "crash": -3, "crashes": -3, "plunge": -3, "plunges": -3, "collapse": -3,
+    "hack": -3, "hacked": -3, "exploit": -3, "bankruptcy": -3, "fraud": -3,
+    "scam": -3, "dump": -2, "dumps": -2, "selloff": -2, "liquidation": -2,
+    "liquidations": -2, "lawsuit": -2, "ban": -2, "banned": -2, "bearish": -2,
+    "crackdown": -2, "outflows": -2, "outflow": -2, "crisis": -2,
+    # bajistas leves (-1)
+    "falls": -1, "fall": -1, "drop": -1, "drops": -1, "decline": -1,
+    "declines": -1, "tumble": -1, "slump": -1, "warning": -1, "fear": -1,
+    "fine": -1, "downgrade": -1, "loss": -1, "losses": -1, "negative": -1,
+    "risk": -1, "sell": -1, "selling": -1, "red": -1,
 }
+NEGADORES = {"no", "not", "without", "denies", "denied", "never", "fails", "fail", "avoids"}
 # ────────────────────────────────────────────────────────────────────────────
 
 
@@ -84,7 +100,7 @@ def ahora():
     return datetime.now(timezone.utc).astimezone().strftime("%H:%M:%S")
 
 
-# ── Indicadores técnicos (sin librerías extra) ──────────────────────────────
+# ── Indicadores técnicos ────────────────────────────────────────────────────
 def ema(valores, periodo):
     if len(valores) < periodo:
         return None
@@ -96,7 +112,6 @@ def ema(valores, periodo):
 
 
 def serie_ema(valores, periodo):
-    """Devuelve la serie completa de EMA (para calcular el MACD)."""
     if len(valores) < periodo:
         return []
     k = 2 / (periodo + 1)
@@ -124,7 +139,6 @@ def rsi(valores, periodo):
 
 
 def macd(valores, rapida=12, lenta=26, senal=9):
-    """Devuelve (macd_line, signal_line, histograma) o (None, None, None)."""
     if len(valores) < lenta + senal:
         return None, None, None
     ema_r = serie_ema(valores, rapida)
@@ -134,13 +148,11 @@ def macd(valores, rapida=12, lenta=26, senal=9):
     if len(macd_line) < senal:
         return None, None, None
     signal = serie_ema(macd_line, senal)
-    hist = macd_line[-1] - signal[-1]
-    return round(macd_line[-1], 2), round(signal[-1], 2), round(hist, 2)
+    return round(macd_line[-1], 2), round(signal[-1], 2), round(macd_line[-1] - signal[-1], 2)
 
 
-# ── Análisis de noticias ────────────────────────────────────────────────────
-def bajar_titulares(limite=12):
-    """Baja titulares recientes de los feeds RSS. Devuelve lista de textos."""
+# ── Análisis de noticias (más inteligente) ──────────────────────────────────
+def bajar_titulares(limite=14):
     titulares = []
     for url in FEEDS:
         try:
@@ -149,43 +161,87 @@ def bajar_titulares(limite=12):
                 raiz = ET.fromstring(r.read())
             for item in raiz.iter("item"):
                 t = item.findtext("title")
-                if t:
+                if t and t.strip() not in titulares:
                     titulares.append(t.strip())
-                if len(titulares) >= limite * len(FEEDS):
-                    break
         except Exception:
-            continue  # si un feed falla, seguimos con los otros
-    return titulares[: limite]
+            continue
+    return titulares[:limite]
 
 
 def sentimiento_texto(texto):
-    """Puntaje de un titular: (+) alcista, (-) bajista, 0 neutral."""
-    palabras = "".join(c.lower() if c.isalnum() or c == "-" else " " for c in texto).split()
-    a = sum(1 for p in palabras if p in PALABRAS_ALCISTAS)
-    b = sum(1 for p in palabras if p in PALABRAS_BAJISTAS)
-    return a - b
+    """Puntaje del titular con pesos, frases y negaciones."""
+    t = texto.lower()
+    puntaje = 0
+    # 1) Frases de varias palabras (se sacan del texto para no contar doble)
+    for frase, peso in FRASES.items():
+        if frase in t:
+            puntaje += peso
+            t = t.replace(frase, " ")
+    # 2) Palabras sueltas, con negación (si antes hay un negador, se invierte)
+    tokens = re.findall(r"[a-z']+", t)
+    for i, w in enumerate(tokens):
+        if w in PALABRAS:
+            peso = PALABRAS[w]
+            ventana = tokens[max(0, i - 2):i]
+            if any(neg in ventana for neg in NEGADORES):
+                peso = -peso  # "not bullish" → bajista
+            puntaje += peso
+    return puntaje
 
 
 def analizar_noticias():
-    """Devuelve dict con veredicto, puntaje y titulares con su sentimiento."""
+    """Veredicto + ánimo (-100..100) + confianza + resumen para el chat."""
     titulares = bajar_titulares()
     if not titulares:
-        return {"veredicto": "SIN DATOS", "puntaje": 0, "titulares": [],
-                "resumen": "No se pudieron bajar noticias (sin conexión o feeds caídos)."}
-    detalle, total = [], 0
+        return {"veredicto": "SIN DATOS", "animo": 0, "confianza": 0, "titulares": [],
+                "resumen": "No se pudieron bajar noticias (sin conexión o feeds caídos).",
+                "top_alcista": None, "top_bajista": None}
+    detalle, total, con_senal = [], 0, 0
     for t in titulares:
         s = sentimiento_texto(t)
         total += s
+        if s != 0:
+            con_senal += 1
         etiqueta = "alcista" if s > 0 else "bajista" if s < 0 else "neutral"
-        detalle.append({"titulo": t, "sent": etiqueta})
-    if total >= 2:
+        detalle.append({"titulo": t, "sent": etiqueta, "score": s})
+
+    n = len(titulares)
+    animo = max(-100, min(100, round(total / n * 25)))
+    confianza = round(con_senal / n * 100)
+    if animo >= 15:
         veredicto = "ALCISTA"
-    elif total <= -2:
+    elif animo <= -15:
         veredicto = "BAJISTA"
     else:
         veredicto = "NEUTRAL"
-    return {"veredicto": veredicto, "puntaje": total, "titulares": detalle,
-            "resumen": f"{len(titulares)} titulares analizados, puntaje neto {total:+d}."}
+
+    ordenados = sorted(detalle, key=lambda d: d["score"])
+    top_bajista = ordenados[0] if ordenados and ordenados[0]["score"] < 0 else None
+    top_alcista = ordenados[-1] if ordenados and ordenados[-1]["score"] > 0 else None
+
+    return {"veredicto": veredicto, "animo": animo, "confianza": confianza,
+            "titulares": detalle,
+            "resumen": f"{n} titulares analizados · ánimo {animo:+d}/100 · {confianza}% con señal",
+            "top_alcista": top_alcista["titulo"] if top_alcista else None,
+            "top_bajista": top_bajista["titulo"] if top_bajista else None}
+
+
+def texto_resumen_mercado(noticias):
+    """Arma un resumen listo para mandar al chat/WhatsApp."""
+    v = noticias.get("veredicto", "—")
+    emoji = {"ALCISTA": "🟢", "BAJISTA": "🔴", "NEUTRAL": "🟡"}.get(v, "⚪")
+    lineas = [
+        "📊 *Resumen del mercado cripto*",
+        f"Clima general: {emoji} *{v}*  (ánimo {noticias.get('animo', 0):+d}/100)",
+        noticias.get("resumen", ""),
+        "",
+    ]
+    if noticias.get("top_alcista"):
+        lineas.append(f"🟢 Lo más positivo: {noticias['top_alcista']}")
+    if noticias.get("top_bajista"):
+        lineas.append(f"🔴 Lo más negativo: {noticias['top_bajista']}")
+    lineas += ["", f"🕒 {datetime.now().strftime('%d/%m/%Y %H:%M')}"]
+    return "\n".join(l for l in lineas if l is not None)
 
 
 # ── El bot ──────────────────────────────────────────────────────────────────
@@ -194,6 +250,7 @@ class BotTrading:
         self.lock = threading.Lock()
         self.hilo = None
         self.encendido = False
+        self.exchange = None
         self.reset_estado()
 
     def reset_estado(self):
@@ -208,8 +265,10 @@ class BotTrading:
         self.operaciones = 0
         self.ganadoras = 0
         self.indicadores = {}
+        self.historial = []            # últimos cierres, para el gráfico
         self.tecnico = {"veredicto": "—", "motivos": []}
-        self.noticias = {"veredicto": "—", "puntaje": 0, "titulares": [], "resumen": ""}
+        self.noticias = {"veredicto": "—", "animo": 0, "confianza": 0,
+                         "titulares": [], "resumen": "", "top_alcista": None, "top_bajista": None}
         self.decision = "—"
         self.pensamiento = "El bot está apagado."
         self.log = []
@@ -235,9 +294,10 @@ class BotTrading:
                 "comisiones": round(self.comisiones, 4), "operaciones": self.operaciones,
                 "ganadoras": self.ganadoras,
                 "win_rate": round(self.ganadoras / self.operaciones * 100, 1) if self.operaciones else 0,
-                "indicadores": self.indicadores, "tecnico": self.tecnico,
-                "noticias": self.noticias, "decision": self.decision,
-                "pensamiento": self.pensamiento, "log": self.log, "error": self.error,
+                "indicadores": self.indicadores, "historial": self.historial,
+                "tecnico": self.tecnico, "noticias": self.noticias,
+                "decision": self.decision, "pensamiento": self.pensamiento,
+                "log": self.log, "error": self.error,
                 "config": {"timeframe": TIMEFRAME, "intervalo": INTERVALO,
                            "take_profit": TAKE_PROFIT, "stop_loss": STOP_LOSS,
                            "comision": COMISION},
@@ -285,7 +345,7 @@ class BotTrading:
     def correr(self):
         self.registrar("info", f"🟢 Bot ENCENDIDO en modo {self.modo.upper()} — {self.symbol}")
         try:
-            exchange = self.crear_exchange()
+            self.exchange = self.crear_exchange()
         except Exception as e:
             self.error = f"No se pudo conectar al exchange: {e}"
             self.registrar("error", f"❌ {self.error}")
@@ -294,10 +354,22 @@ class BotTrading:
                 self.fase = "APAGADO"
             return
 
+        # En testnet/real, arrancamos el capital desde el balance real de USDT
+        if self.modo in ("testnet", "real"):
+            try:
+                bal = self.exchange.fetch_balance()
+                usdt = bal.get("USDT", {}).get("free", None)
+                if usdt is not None:
+                    with self.lock:
+                        self.capital = float(usdt)
+                    self.registrar("info", f"💰 Balance {self.modo}: {usdt:.2f} USDT")
+            except Exception as e:
+                self.registrar("error", f"⚠️ No pude leer el balance ({e}). Uso capital por defecto.")
+
         fallos = 0
         while self.encendido:
             try:
-                self.una_vuelta(exchange)
+                self.una_vuelta(self.exchange)
                 fallos = 0
                 with self.lock:
                     self.error = None
@@ -318,9 +390,8 @@ class BotTrading:
                     break
                 time.sleep(1)
 
-    # ---- una vuelta: cargar → analizar → decidir ----
+    # ---- una vuelta ----
     def una_vuelta(self, exchange):
-        # 1) CARGAR ─────────────────────────────────────────────
         with self.lock:
             self.fase = "CARGANDO"
             self.pensamiento = "Cargando velas del mercado y titulares de noticias..."
@@ -329,29 +400,25 @@ class BotTrading:
         precio = cierres[-1]
         with self.lock:
             self.precio = precio
+            self.historial = [round(c, 2) for c in cierres[-60:]]
 
-        # Noticias: se refrescan cada NOTICIAS_CADA segundos (no en cada vuelta)
         if time.time() - self._ultima_noticia > NOTICIAS_CADA or not self.noticias["titulares"]:
             noticias = analizar_noticias()
             with self.lock:
                 self.noticias = noticias
                 self._ultima_noticia = time.time()
 
-        # 2) ANALIZAR ───────────────────────────────────────────
         with self.lock:
             self.fase = "ANALIZANDO"
         tecnico = self.analizar_tecnico(cierres)
         with self.lock:
             self.tecnico = tecnico
-        veredicto_noticias = self.noticias["veredicto"]
 
-        # 3) DECIDIR / OPERAR ───────────────────────────────────
         with self.lock:
             self.fase = "OPERANDO"
-        self.decidir(precio, tecnico["veredicto"], veredicto_noticias)
+        self.decidir(precio, tecnico["veredicto"], self.noticias["veredicto"])
 
     def analizar_tecnico(self, cierres):
-        """Confluencia de EMA + RSI + MACD → ALCISTA / BAJISTA / NEUTRAL."""
         ema_r = ema(cierres, EMA_RAPIDA)
         ema_l = ema(cierres, EMA_LENTA)
         rsi_v = rsi(cierres, RSI_PERIODO)
@@ -366,12 +433,10 @@ class BotTrading:
             return {"veredicto": "SIN DATOS", "motivos": ["Faltan velas para calcular indicadores."]}
 
         puntos, motivos = 0, []
-        # EMA (tendencia)
         if ema_r > ema_l:
             puntos += 1; motivos.append(f"EMA{EMA_RAPIDA} > EMA{EMA_LENTA} (tendencia alcista)")
         else:
             puntos -= 1; motivos.append(f"EMA{EMA_RAPIDA} < EMA{EMA_LENTA} (tendencia bajista)")
-        # RSI (momentum, evitando extremos)
         if rsi_v > 70:
             puntos -= 1; motivos.append(f"RSI {rsi_v} sobrecomprado (riesgo de caída)")
         elif rsi_v < 30:
@@ -380,7 +445,6 @@ class BotTrading:
             puntos += 1; motivos.append(f"RSI {rsi_v} con momentum alcista")
         else:
             motivos.append(f"RSI {rsi_v} neutro")
-        # MACD (impulso)
         if hist > 0:
             puntos += 1; motivos.append("MACD por encima de su señal (impulso alcista)")
         else:
@@ -390,19 +454,13 @@ class BotTrading:
         return {"veredicto": veredicto, "motivos": motivos, "puntos": puntos}
 
     def decidir(self, precio, tec, noti):
-        """Regla central: operar SOLO si técnico y noticias coinciden."""
-        # Si ya hay posición abierta, gestionar salida
         if self.posicion:
             self.gestionar_posicion(precio, tec, noti)
             return
-
-        coinciden_alcista = (tec == "ALCISTA" and noti == "ALCISTA")
-
-        if coinciden_alcista:
+        if tec == "ALCISTA" and noti == "ALCISTA":
             self.abrir_posicion(precio,
                 "el análisis técnico Y las noticias coinciden en ALCISTA (no se contradicen)")
         else:
-            # explicar por qué NO opera
             if tec == "ALCISTA" and noti == "BAJISTA":
                 razon = "el técnico dice ALCISTA pero las noticias dicen BAJISTA → se contradicen"
             elif tec == "BAJISTA" and noti == "ALCISTA":
@@ -418,7 +476,16 @@ class BotTrading:
                 self.pensamiento = (f"Me quedo QUIETO porque {razon}. "
                                     f"Solo compro cuando técnico y noticias están de acuerdo.")
 
-    # ---- operaciones (modo simulado: se simulan en memoria) ----
+    # ---- ejecución de órdenes ----
+    def _orden_real(self, lado, cantidad):
+        """Manda una orden de mercado real (testnet/real). Devuelve precio de fill."""
+        cantidad = float(self.exchange.amount_to_precision(self.symbol, cantidad))
+        if lado == "buy":
+            orden = self.exchange.create_market_buy_order(self.symbol, cantidad)
+        else:
+            orden = self.exchange.create_market_sell_order(self.symbol, cantidad)
+        return orden.get("average") or orden.get("price") or self.precio, cantidad
+
     def abrir_posicion(self, precio, razon):
         monto = self.capital * (RIESGO_PCT / 100)
         if monto < 10:
@@ -426,6 +493,14 @@ class BotTrading:
                 self.pensamiento = "Capital insuficiente para abrir una posición."
             return
         cantidad = monto / precio
+        # En testnet/real mandamos la orden de verdad
+        if self.modo in ("testnet", "real"):
+            try:
+                precio, cantidad = self._orden_real("buy", cantidad)
+                monto = cantidad * precio
+            except Exception as e:
+                self.registrar("error", f"❌ No se pudo COMPRAR en {self.modo}: {e}")
+                return
         comision = monto * (COMISION / 100)
         with self.lock:
             self.capital -= (monto + comision)
@@ -459,6 +534,12 @@ class BotTrading:
         precio = precio or self.precio
         cantidad = self.posicion["cantidad"]
         entrada = self.posicion["precio_entrada"]
+        if self.modo in ("testnet", "real"):
+            try:
+                precio, cantidad = self._orden_real("sell", cantidad)
+            except Exception as e:
+                self.registrar("error", f"❌ No se pudo VENDER en {self.modo}: {e}")
+                return
         valor_venta = cantidad * precio
         comision = valor_venta * (COMISION / 100)
         ganancia = (precio - entrada) * cantidad - comision
@@ -479,6 +560,27 @@ class BotTrading:
 
 
 bot = BotTrading()
+
+
+# ── Envío del resumen por WhatsApp (Twilio, opcional) ───────────────────────
+def enviar_whatsapp(texto, destino):
+    """Envía el resumen por WhatsApp usando el Twilio del proyecto."""
+    sid = os.getenv("TWILIO_ACCOUNT_SID")
+    token = os.getenv("TWILIO_AUTH_TOKEN")
+    desde = os.getenv("TWILIO_WHATSAPP_FROM")
+    if not (sid and token and desde):
+        return False, "Falta configurar Twilio en el .env (TWILIO_ACCOUNT_SID / _AUTH_TOKEN / _WHATSAPP_FROM)."
+    if not destino:
+        return False, "Falta el número destino. Poné BOT_WHATSAPP_TO en el .env o mandalo desde el panel."
+    try:
+        from twilio.rest import Client
+        if not destino.startswith("+"):
+            destino = "+549" + destino
+        Client(sid, token).messages.create(
+            body=texto, from_=desde, to=f"whatsapp:{destino}")
+        return True, "Resumen enviado por WhatsApp ✅"
+    except Exception as e:
+        return False, f"Error al enviar: {e}"
 
 
 # ── Servidor web (panel + API) ──────────────────────────────────────────────
@@ -509,6 +611,10 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_response(404); self.end_headers()
         elif self.path == "/estado":
             self._json(bot.snapshot())
+        elif self.path == "/resumen":
+            # genera (o reusa) el resumen del mercado como texto
+            noticias = bot.noticias if bot.noticias.get("titulares") else analizar_noticias()
+            self._json({"texto": texto_resumen_mercado(noticias), "noticias": noticias})
         else:
             self.send_response(404); self.end_headers()
 
@@ -517,12 +623,22 @@ class Handler(BaseHTTPRequestHandler):
             ok = bot.encender()
             self._json({"ok": ok, "mensaje": "Bot encendido" if ok else "Ya estaba encendido"})
         elif self.path == "/apagar":
-            length = int(self.headers.get("Content-Length", 0))
-            body = json.loads(self.rfile.read(length)) if length else {}
+            body = self._body()
             ok = bot.apagar(cerrar_todo=bool(body.get("cerrar_todo", False)))
             self._json({"ok": ok, "mensaje": "Bot apagado" if ok else "Ya estaba apagado"})
+        elif self.path == "/enviar_resumen":
+            body = self._body()
+            noticias = bot.noticias if bot.noticias.get("titulares") else analizar_noticias()
+            texto = texto_resumen_mercado(noticias)
+            destino = body.get("destino") or WHATSAPP_TO
+            ok, msg = enviar_whatsapp(texto, destino)
+            self._json({"ok": ok, "mensaje": msg, "texto": texto})
         else:
             self.send_response(404); self.end_headers()
+
+    def _body(self):
+        length = int(self.headers.get("Content-Length", 0))
+        return json.loads(self.rfile.read(length)) if length else {}
 
     def log_message(self, format, *args):
         pass
