@@ -28,7 +28,7 @@ Panel:  http://localhost:8000
 
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from dotenv import load_dotenv
-import json, os, threading, time, traceback, urllib.request, re
+import json, os, threading, time, traceback, urllib.request, re, unicodedata
 from datetime import datetime, timezone
 from xml.etree import ElementTree as ET
 
@@ -91,8 +91,30 @@ PALABRAS = {
     "declines": -1, "tumble": -1, "slump": -1, "warning": -1, "fear": -1,
     "fine": -1, "downgrade": -1, "loss": -1, "losses": -1, "negative": -1,
     "risk": -1, "sell": -1, "selling": -1, "red": -1,
+    # ── ESPAÑOL (para el resumen del profe; guardadas SIN acento) ──
+    # alcistas
+    "sube": 1, "subir": 1, "suba": 1, "subiendo": 1, "alcista": 2, "alcistas": 2,
+    "compra": 1, "comprar": 1, "comprando": 1, "largo": 1, "largos": 1,
+    "ruptura": 2, "rompe": 1, "acumular": 1, "acumulando": 1, "rebote": 1,
+    "recuperacion": 1, "recupera": 1, "optimismo": 1, "maximos": 2, "maximo": 1,
+    "toro": 1, "gana": 1, "ganancia": 1, "impulso": 1, "despegue": 2, "despega": 2,
+    "dispara": 2, "disparan": 2, "sostiene": 1, "fortaleza": 1, "verdes": 1,
+    # bajistas
+    "baja": -1, "bajar": -1, "bajando": -1, "bajista": -2, "bajistas": -2,
+    "cae": -1, "caen": -1, "caida": -1, "desplome": -3, "desploma": -3,
+    "vender": -1, "venta": -1, "vende": -1, "corto": -1, "cortos": -1,
+    "correccion": -1, "panico": -2, "miedo": -1, "liquidacion": -2,
+    "estafa": -3, "hackeo": -3, "prohibicion": -2, "demanda": -2, "riesgo": -1,
+    "perdida": -1, "pierde": -1, "debilidad": -1, "rojos": -1, "derrumbe": -3,
 }
-NEGADORES = {"no", "not", "without", "denies", "denied", "never", "fails", "fail", "avoids"}
+NEGADORES = {"no", "not", "without", "denies", "denied", "never", "fails", "fail",
+             "avoids", "sin", "nunca", "tampoco", "evita"}
+
+
+def _sin_acentos(s):
+    """Quita acentos (á→a) para que el léxico en español matchee siempre."""
+    return "".join(c for c in unicodedata.normalize("NFD", s)
+                   if unicodedata.category(c) != "Mn")
 # ────────────────────────────────────────────────────────────────────────────
 
 
@@ -169,8 +191,8 @@ def bajar_titulares(limite=14):
 
 
 def sentimiento_texto(texto):
-    """Puntaje del titular con pesos, frases y negaciones."""
-    t = texto.lower()
+    """Puntaje del titular con pesos, frases y negaciones (inglés y español)."""
+    t = _sin_acentos(texto.lower())
     puntaje = 0
     # 1) Frases de varias palabras (se sacan del texto para no contar doble)
     for frase, peso in FRASES.items():
@@ -182,7 +204,7 @@ def sentimiento_texto(texto):
     for i, w in enumerate(tokens):
         if w in PALABRAS:
             peso = PALABRAS[w]
-            ventana = tokens[max(0, i - 2):i]
+            ventana = tokens[max(0, i - 3):i]
             if any(neg in ventana for neg in NEGADORES):
                 peso = -peso  # "not bullish" → bajista
             puntaje += peso
@@ -226,6 +248,25 @@ def analizar_noticias():
             "top_bajista": top_bajista["titulo"] if top_bajista else None}
 
 
+def analizar_texto_manual(texto, bias="auto"):
+    """Analiza el resumen que carga el usuario (ej: el del profe de trading).
+    bias: 'auto' = lo decide el análisis; o forzado a 'alcista'/'bajista'/'neutral'."""
+    texto = (texto or "").strip()
+    raw = sentimiento_texto(texto) if texto else 0
+    animo = max(-100, min(100, raw * 8))
+    bias = (bias or "auto").lower()
+    if bias == "alcista":
+        veredicto, animo = "ALCISTA", max(animo, 50)
+    elif bias == "bajista":
+        veredicto, animo = "BAJISTA", min(animo, -50)
+    elif bias == "neutral":
+        veredicto, animo = "NEUTRAL", 0
+    else:
+        veredicto = "ALCISTA" if animo >= 15 else "BAJISTA" if animo <= -15 else "NEUTRAL"
+    return {"activo": True, "texto": texto, "veredicto": veredicto, "animo": animo,
+            "bias": bias, "hora": ahora()}
+
+
 def texto_resumen_mercado(noticias):
     """Arma un resumen listo para mandar al chat/WhatsApp."""
     v = noticias.get("veredicto", "—")
@@ -251,6 +292,10 @@ class BotTrading:
         self.hilo = None
         self.encendido = False
         self.exchange = None
+        # El resumen manual (del profe) persiste aunque prendas/apagues el bot
+        self.noticias_manual = {"activo": False, "texto": "", "veredicto": "—",
+                                "animo": 0, "bias": "auto", "hora": ""}
+        self.noticias_fuente = "auto"   # "auto" (RSS) o "manual" (profe)
         self.reset_estado()
 
     def reset_estado(self):
@@ -296,6 +341,7 @@ class BotTrading:
                 "win_rate": round(self.ganadoras / self.operaciones * 100, 1) if self.operaciones else 0,
                 "indicadores": self.indicadores, "historial": self.historial,
                 "tecnico": self.tecnico, "noticias": self.noticias,
+                "noticias_manual": self.noticias_manual, "noticias_fuente": self.noticias_fuente,
                 "decision": self.decision, "pensamiento": self.pensamiento,
                 "log": self.log, "error": self.error,
                 "config": {"timeframe": TIMEFRAME, "intervalo": INTERVALO,
@@ -414,9 +460,18 @@ class BotTrading:
         with self.lock:
             self.tecnico = tecnico
 
+        # Noticias efectivas: si cargaste un resumen manual (del profe), ese manda
+        with self.lock:
+            if self.noticias_manual.get("activo"):
+                veredicto_noticias = self.noticias_manual["veredicto"]
+                self.noticias_fuente = "manual"
+            else:
+                veredicto_noticias = self.noticias["veredicto"]
+                self.noticias_fuente = "auto"
+
         with self.lock:
             self.fase = "OPERANDO"
-        self.decidir(precio, tecnico["veredicto"], self.noticias["veredicto"])
+        self.decidir(precio, tecnico["veredicto"], veredicto_noticias)
 
     def analizar_tecnico(self, cierres):
         ema_r = ema(cierres, EMA_RAPIDA)
@@ -633,6 +688,23 @@ class Handler(BaseHTTPRequestHandler):
             destino = body.get("destino") or WHATSAPP_TO
             ok, msg = enviar_whatsapp(texto, destino)
             self._json({"ok": ok, "mensaje": msg, "texto": texto})
+        elif self.path == "/noticias_manual":
+            body = self._body()
+            manual = analizar_texto_manual(body.get("texto", ""), body.get("bias", "auto"))
+            with bot.lock:
+                bot.noticias_manual = manual
+            bot.registrar("info",
+                f"🎓 Resumen manual cargado → veredicto {manual['veredicto']} "
+                f"(ánimo {manual['animo']:+d}, fuente: profe).")
+            self._json({"ok": True, "mensaje": f"Resumen cargado: {manual['veredicto']}",
+                        "noticias_manual": manual})
+        elif self.path == "/borrar_noticias_manual":
+            with bot.lock:
+                bot.noticias_manual = {"activo": False, "texto": "", "veredicto": "—",
+                                       "animo": 0, "bias": "auto", "hora": ""}
+                bot.noticias_fuente = "auto"
+            bot.registrar("info", "🎓 Resumen manual borrado → vuelve a noticias automáticas.")
+            self._json({"ok": True, "mensaje": "Resumen manual borrado"})
         else:
             self.send_response(404); self.end_headers()
 

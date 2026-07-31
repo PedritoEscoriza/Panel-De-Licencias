@@ -170,6 +170,27 @@
     </div>
 
     <div>
+      <!-- Resumen del profe (noticias manuales) -->
+      <div class="box">
+        <h3>🎓 Análisis del profe <span id="fuenteNoti" style="text-transform:none;font-weight:400;font-size:12px;"></span></h3>
+        <textarea id="textoProfe" placeholder="Pegá acá el resumen/análisis que manda el profe de trading al grupo..."
+          style="width:100%;min-height:90px;background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;color:var(--txt);font-size:14px;resize:vertical;font-family:inherit;"></textarea>
+        <div class="fila">
+          <span style="font-size:12px;color:var(--muted);align-self:center;">Dirección:</span>
+          <select id="biasProfe" style="background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--txt);font-size:13px;">
+            <option value="auto">Automático (según el texto)</option>
+            <option value="alcista">Forzar ALCISTA 🟢</option>
+            <option value="bajista">Forzar BAJISTA 🔴</option>
+            <option value="neutral">Forzar NEUTRAL 🟡</option>
+          </select>
+        </div>
+        <div class="fila">
+          <button class="btn-chico btn-wa" style="background:var(--azul);color:#fff;" onclick="cargarProfe()">💾 Cargar y usar</button>
+          <button class="btn-chico btn-sec" onclick="borrarProfe()">🗑️ Borrar (volver a auto)</button>
+        </div>
+        <div class="msg-envio" id="msgProfe"></div>
+      </div>
+
       <!-- Resumen del mercado + enviar al chat -->
       <div class="box">
         <h3>🌍 Resumen del mercado <button class="btn-chico btn-sec" onclick="cargarResumen()">↻ Actualizar</button></h3>
@@ -243,6 +264,31 @@ function copiarResumen() {
   document.getElementById("msgEnvio").style.color = "var(--muted)";
 }
 
+// ── Análisis del profe (noticias manuales) ──
+async function cargarProfe() {
+  const texto = document.getElementById("textoProfe").value.trim();
+  const bias = document.getElementById("biasProfe").value;
+  const msg = document.getElementById("msgProfe");
+  if (!texto && bias === "auto") { msg.textContent = "⚠️ Pegá el texto del profe o elegí una dirección."; msg.style.color = "var(--amarillo)"; return; }
+  msg.textContent = "Cargando...";
+  try {
+    const r = await (await fetch(API + "/noticias_manual", { method: "POST",
+      headers: { "Content-Type": "application/json" }, body: JSON.stringify({ texto, bias }) })).json();
+    msg.textContent = "✅ " + r.mensaje + " — el bot ya lo está usando.";
+    msg.style.color = "var(--verde)";
+  } catch (e) { msg.textContent = "⚠️ Error de conexión."; msg.style.color = "var(--amarillo)"; }
+}
+async function borrarProfe() {
+  const msg = document.getElementById("msgProfe");
+  try {
+    await fetch(API + "/borrar_noticias_manual", { method: "POST" });
+    document.getElementById("textoProfe").value = "";
+    document.getElementById("biasProfe").value = "auto";
+    msg.textContent = "🗑️ Borrado. Vuelve a las noticias automáticas.";
+    msg.style.color = "var(--muted)";
+  } catch (e) { msg.textContent = "⚠️ Error de conexión."; }
+}
+
 // ── Gráfico de precio (canvas, sin librerías) ──
 function dibujarChart(datos) {
   const c = document.getElementById("chart");
@@ -294,10 +340,20 @@ async function actualizar() {
   dibujarChart(s.historial);
 
   const tec = (s.tecnico && s.tecnico.veredicto) || "—";
-  const noti = (s.noticias && s.noticias.veredicto) || "—";
+  // Noticias efectivas: si hay resumen del profe cargado, ese manda
+  const manual = s.noticias_manual && s.noticias_manual.activo;
+  const notiObj = manual ? s.noticias_manual : (s.noticias || {});
+  const noti = notiObj.veredicto || "—";
   const vTec = document.getElementById("vTec"); vTec.textContent = tec; vTec.className = claseVer(tec);
   const vNoti = document.getElementById("vNoti"); vNoti.textContent = noti; vNoti.className = claseVer(noti);
-  document.getElementById("vNotiSub").textContent = s.noticias && s.noticias.animo !== undefined ? ("ánimo " + (s.noticias.animo >= 0 ? "+" : "") + s.noticias.animo + "/100") : "";
+  document.getElementById("vNotiSub").textContent = notiObj.animo !== undefined ? ("ánimo " + (notiObj.animo >= 0 ? "+" : "") + notiObj.animo + "/100") : "";
+  const fuente = document.getElementById("fuenteNoti");
+  if (fuente) {
+    fuente.textContent = manual ? "● en uso (prioridad)" : "○ usando noticias automáticas";
+    fuente.style.color = manual ? "var(--verde)" : "var(--muted)";
+  }
+  const vNotiTit = document.querySelector("#vNoti").previousElementSibling;
+  if (vNotiTit) vNotiTit.textContent = manual ? "🎓 Noticias (profe)" : "📰 Noticias (auto)";
 
   const df = document.getElementById("decisionFinal");
   df.textContent = s.decision || "—";
