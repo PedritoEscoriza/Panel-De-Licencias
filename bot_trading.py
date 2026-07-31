@@ -694,8 +694,8 @@ class Handler(BaseHTTPRequestHandler):
             with bot.lock:
                 bot.noticias_manual = manual
             bot.registrar("info",
-                f"🎓 Resumen manual cargado → veredicto {manual['veredicto']} "
-                f"(ánimo {manual['animo']:+d}, fuente: profe).")
+                f"📥 Información cargada → veredicto {manual['veredicto']} "
+                f"(ánimo {manual['animo']:+d}, fuente: manual).")
             self._json({"ok": True, "mensaje": f"Resumen cargado: {manual['veredicto']}",
                         "noticias_manual": manual})
         elif self.path == "/borrar_noticias_manual":
@@ -703,7 +703,7 @@ class Handler(BaseHTTPRequestHandler):
                 bot.noticias_manual = {"activo": False, "texto": "", "veredicto": "—",
                                        "animo": 0, "bias": "auto", "hora": ""}
                 bot.noticias_fuente = "auto"
-            bot.registrar("info", "🎓 Resumen manual borrado → vuelve a noticias automáticas.")
+            bot.registrar("info", "📥 Información borrada → vuelve a noticias automáticas.")
             self._json({"ok": True, "mensaje": "Resumen manual borrado"})
         else:
             self.send_response(404); self.end_headers()
