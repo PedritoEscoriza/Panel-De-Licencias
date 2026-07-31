@@ -11,63 +11,69 @@
     --txt: #e6edf3; --muted: #8b98a9; --verde: #16c784; --rojo: #ea3943;
     --azul: #3b82f6; --amarillo: #f0b90b;
   }
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    background: var(--bg); color: var(--txt); padding: 20px; line-height: 1.5;
-  }
-  .wrap { max-width: 1100px; margin: 0 auto; }
-  header {
-    display: flex; align-items: center; justify-content: space-between;
-    flex-wrap: wrap; gap: 12px; margin-bottom: 20px;
-  }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg); color: var(--txt); padding: 20px; line-height: 1.5; }
+  .wrap { max-width: 1150px; margin: 0 auto; }
+  header { display: flex; align-items: center; justify-content: space-between;
+    flex-wrap: wrap; gap: 12px; margin-bottom: 20px; }
   h1 { font-size: 22px; display: flex; align-items: center; gap: 10px; }
-  .modo-badge {
-    padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 700;
-    text-transform: uppercase; letter-spacing: .5px;
-  }
+  .modo-badge { padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: .5px; }
   .modo-simulado { background: #1e3a5f; color: #7db8ff; }
   .modo-testnet  { background: #4a3d0a; color: var(--amarillo); }
   .modo-real     { background: #4a1015; color: #ff6b74; animation: pulso 1.5s infinite; }
   @keyframes pulso { 50% { opacity: .55; } }
 
-  .fase-bar {
-    display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap;
-  }
-  .fase {
-    flex: 1; min-width: 110px; padding: 12px; border-radius: 10px;
-    background: var(--panel); border: 1px solid var(--border);
-    text-align: center; font-size: 13px; color: var(--muted);
-    transition: all .3s; position: relative;
-  }
+  .fase-bar { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
+  .fase { flex: 1; min-width: 110px; padding: 12px; border-radius: 10px; background: var(--panel);
+    border: 1px solid var(--border); text-align: center; font-size: 13px; color: var(--muted);
+    transition: all .3s; position: relative; }
   .fase.activa { color: var(--txt); border-color: var(--azul); background: var(--panel2); }
-  .fase.activa::after {
-    content: ""; position: absolute; bottom: -1px; left: 10%; width: 80%; height: 2px;
-    background: var(--azul); border-radius: 2px;
-  }
+  .fase.activa::after { content: ""; position: absolute; bottom: -1px; left: 10%; width: 80%;
+    height: 2px; background: var(--azul); border-radius: 2px; }
   .fase .n { font-size: 11px; opacity: .6; }
 
-  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 20px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 20px; }
   .card { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
   .card .label { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
   .card .valor { font-size: 22px; font-weight: 700; }
-  .verde { color: var(--verde); } .rojo { color: var(--rojo); }
+  .verde { color: var(--verde); } .rojo { color: var(--rojo); } .amar { color: var(--amarillo); }
 
   .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-  @media (max-width: 760px) { .cols { grid-template-columns: 1fr; } }
+  @media (max-width: 780px) { .cols { grid-template-columns: 1fr; } }
 
   .box { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
   .box h3 { font-size: 14px; margin-bottom: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
 
-  .pensamiento {
-    background: var(--panel2); border-left: 3px solid var(--azul); border-radius: 8px;
-    padding: 14px; font-size: 15px; min-height: 60px;
-  }
+  /* Confluencia técnico + noticias */
+  .confluencia { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+  .veredicto { text-align: center; padding: 14px; border-radius: 10px; background: var(--panel2); border: 1px solid var(--border); }
+  .veredicto .tit { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px; }
+  .veredicto .val { font-size: 20px; font-weight: 800; }
+  .v-ALCISTA { color: var(--verde); } .v-BAJISTA { color: var(--rojo); }
+  .v-NEUTRAL, .v-SINDATOS { color: var(--muted); }
+  .decision-final { text-align: center; padding: 14px; border-radius: 10px; font-size: 18px; font-weight: 800;
+    border: 1px solid var(--border); }
+  .d-COMPRAR, .d-EN.POSICION { background: #0f2f22; color: var(--verde); border-color: var(--verde); }
+  .d-VENDER { background: #3a2b06; color: var(--amarillo); border-color: var(--amarillo); }
+  .d-NO.OPERAR, .d-default { background: var(--panel2); color: var(--muted); }
 
-  .ind { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
-  .ind:last-child { border-bottom: none; }
-  .ind .k { color: var(--muted); }
+  .pensamiento { background: var(--panel2); border-left: 3px solid var(--azul); border-radius: 8px;
+    padding: 14px; font-size: 15px; min-height: 60px; }
 
-  .log { max-height: 340px; overflow-y: auto; font-size: 13px; }
+  .motivos { list-style: none; font-size: 13px; }
+  .motivos li { padding: 5px 0; border-bottom: 1px solid var(--border); color: var(--muted); }
+  .motivos li:last-child { border-bottom: none; }
+
+  .ind { display: flex; justify-content: space-between; padding: 7px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
+  .ind:last-child { border-bottom: none; } .ind .k { color: var(--muted); }
+
+  .titulares { max-height: 260px; overflow-y: auto; font-size: 13px; }
+  .titular { padding: 8px 10px; border-radius: 6px; margin-bottom: 4px; background: var(--panel2);
+    border-left: 3px solid var(--muted); }
+  .t-alcista { border-left-color: var(--verde); } .t-bajista { border-left-color: var(--rojo); }
+
+  .log { max-height: 300px; overflow-y: auto; font-size: 13px; }
   .log-item { padding: 8px 10px; border-radius: 6px; margin-bottom: 4px; background: var(--panel2); }
   .log-item .hora { color: var(--muted); font-size: 11px; margin-right: 8px; }
   .log-compra { border-left: 3px solid var(--verde); }
@@ -76,19 +82,14 @@
   .log-info   { border-left: 3px solid var(--azul); }
 
   .controles { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
-  button {
-    border: none; border-radius: 10px; padding: 14px 28px; font-size: 16px; font-weight: 700;
-    cursor: pointer; transition: transform .1s, opacity .2s;
-  }
-  button:active { transform: scale(.97); }
-  button:disabled { opacity: .4; cursor: not-allowed; }
-  .btn-on  { background: var(--verde); color: #041b12; }
+  button { border: none; border-radius: 10px; padding: 14px 28px; font-size: 16px; font-weight: 700;
+    cursor: pointer; transition: transform .1s, opacity .2s; }
+  button:active { transform: scale(.97); } button:disabled { opacity: .4; cursor: not-allowed; }
+  .btn-on { background: var(--verde); color: #041b12; }
   .btn-off { background: var(--rojo); color: #fff; }
   .btn-panico { background: transparent; color: var(--rojo); border: 1px solid var(--rojo); padding: 14px 18px; font-size: 13px; }
-
   .estado-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; }
-  .on  { background: var(--verde); box-shadow: 0 0 8px var(--verde); }
-  .off { background: var(--muted); }
+  .on { background: var(--verde); box-shadow: 0 0 8px var(--verde); } .off { background: var(--muted); }
   .aviso { font-size: 12px; color: var(--muted); margin-top: 10px; }
   .warn-real { background: #4a1015; color: #ff9ba1; padding: 12px; border-radius: 8px; margin-bottom: 16px; font-size: 14px; display:none; }
 </style>
@@ -103,7 +104,6 @@
 
   <div id="warnReal" class="warn-real">⚠️ <b>MODO REAL activado</b> — el bot opera con plata de verdad.</div>
 
-  <!-- Fases -->
   <div class="fase-bar">
     <div class="fase" data-fase="APAGADO"><div class="n">estado</div>⏻ Apagado</div>
     <div class="fase" data-fase="CARGANDO"><div class="n">fase 1</div>📥 Cargando</div>
@@ -111,41 +111,50 @@
     <div class="fase" data-fase="OPERANDO"><div class="n">fase 3</div>⚡ Operando</div>
   </div>
 
-  <!-- Métricas -->
   <div class="grid">
     <div class="card"><div class="label">Precio actual</div><div class="valor" id="precio">—</div></div>
     <div class="card"><div class="label">Capital (USDT)</div><div class="valor" id="capital">—</div></div>
-    <div class="card"><div class="label">P&L de la sesión</div><div class="valor" id="pnl">—</div></div>
-    <div class="card"><div class="label">Comisiones pagadas</div><div class="valor" id="comisiones">—</div></div>
+    <div class="card"><div class="label">P&L sesión</div><div class="valor" id="pnl">—</div></div>
+    <div class="card"><div class="label">Comisiones</div><div class="valor" id="comisiones">—</div></div>
     <div class="card"><div class="label">Operaciones</div><div class="valor" id="ops">—</div></div>
     <div class="card"><div class="label">% aciertos</div><div class="valor" id="winrate">—</div></div>
   </div>
 
+  <!-- Confluencia: técnico + noticias + decisión -->
+  <div class="box">
+    <h3>🎯 Decisión (opera solo si coinciden)</h3>
+    <div class="confluencia">
+      <div class="veredicto"><div class="tit">📈 Análisis técnico</div><div class="val" id="vTec">—</div></div>
+      <div class="veredicto"><div class="tit">📰 Noticias</div><div class="val" id="vNoti">—</div></div>
+    </div>
+    <div class="decision-final d-default" id="decisionFinal">—</div>
+    <div class="pensamiento" id="pensamiento" style="margin-top:12px;">El bot está apagado.</div>
+  </div>
+
   <div class="cols">
     <div>
-      <!-- Pensamiento -->
       <div class="box">
-        <h3>💭 Qué está pensando</h3>
-        <div class="pensamiento" id="pensamiento">El bot está apagado.</div>
+        <h3>📈 Por qué (técnico)</h3>
+        <ul class="motivos" id="motivos"><li>Sin análisis todavía.</li></ul>
       </div>
-
-      <!-- Posición -->
       <div class="box">
         <h3>📊 Posición abierta</h3>
         <div id="posicion" style="color:var(--muted)">Ninguna posición abierta.</div>
       </div>
-
-      <!-- Indicadores -->
       <div class="box">
-        <h3>📈 Indicadores</h3>
+        <h3>🔢 Indicadores</h3>
         <div class="ind"><span class="k">EMA rápida</span><span id="emaR">—</span></div>
         <div class="ind"><span class="k">EMA lenta</span><span id="emaL">—</span></div>
         <div class="ind"><span class="k">RSI</span><span id="rsi">—</span></div>
+        <div class="ind"><span class="k">MACD (hist.)</span><span id="macd">—</span></div>
       </div>
     </div>
 
     <div>
-      <!-- Log -->
+      <div class="box">
+        <h3>📰 Titulares analizados <span id="notiResumen" style="text-transform:none;font-weight:400;"></span></h3>
+        <div class="titulares" id="titulares"><div style="color:var(--muted)">Sin noticias todavía.</div></div>
+      </div>
       <div class="box">
         <h3>📜 Registro en vivo</h3>
         <div class="log" id="log"><div style="color:var(--muted)">Sin actividad todavía.</div></div>
@@ -153,17 +162,16 @@
     </div>
   </div>
 
-  <!-- Controles -->
   <div class="box">
     <h3><span id="dot" class="estado-dot off"></span><span id="estadoTxt">Apagado</span></h3>
     <div class="controles">
-      <button id="btnOn"  class="btn-on"  onclick="encender()">▶ Encender</button>
+      <button id="btnOn" class="btn-on" onclick="encender()">▶ Encender</button>
       <button id="btnOff" class="btn-off" onclick="apagar(false)" disabled>■ Apagar</button>
       <button id="btnPanico" class="btn-panico" onclick="apagar(true)" disabled>🛑 Apagar y cerrar todo</button>
     </div>
     <div class="aviso">
-      "Encender" carga el mercado, analiza y recién ahí opera — y sigue re-analizando en loop.
-      "Apagar y cerrar todo" cierra cualquier posición abierta (botón de pánico).
+      Solo tenés que prenderlo. El bot carga mercado + noticias, analiza los dos, y opera
+      únicamente cuando el técnico y las noticias coinciden. "Apagar y cerrar todo" es el botón de pánico.
     </div>
   </div>
 
@@ -171,43 +179,29 @@
 
 <script>
 const API = location.origin;
-
-async function encender() {
-  await fetch(API + "/encender", { method: "POST" });
-  actualizar();
-}
+async function encender() { await fetch(API + "/encender", { method: "POST" }); actualizar(); }
 async function apagar(cerrarTodo) {
-  await fetch(API + "/apagar", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ cerrar_todo: cerrarTodo })
-  });
+  await fetch(API + "/apagar", { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ cerrar_todo: cerrarTodo }) });
   actualizar();
 }
-
 function fmt(n, dec = 2) {
   if (n === null || n === undefined) return "—";
   return Number(n).toLocaleString("es-AR", { minimumFractionDigits: dec, maximumFractionDigits: dec });
 }
+function claseVer(v) { return "val v-" + String(v).replace(/\s/g, ""); }
 
 async function actualizar() {
   let s;
-  try {
-    s = await (await fetch(API + "/estado")).json();
-  } catch (e) { return; }
+  try { s = await (await fetch(API + "/estado")).json(); } catch (e) { return; }
 
-  // Modo
   const badge = document.getElementById("modoBadge");
-  badge.textContent = s.modo;
-  badge.className = "modo-badge modo-" + s.modo;
+  badge.textContent = s.modo; badge.className = "modo-badge modo-" + s.modo;
   document.getElementById("warnReal").style.display = s.modo === "real" ? "block" : "none";
   document.getElementById("symbol").textContent = s.symbol;
 
-  // Fases
-  document.querySelectorAll(".fase").forEach(f =>
-    f.classList.toggle("activa", f.dataset.fase === s.fase));
+  document.querySelectorAll(".fase").forEach(f => f.classList.toggle("activa", f.dataset.fase === s.fase));
 
-  // Métricas
   document.getElementById("precio").textContent = s.precio ? "$" + fmt(s.precio) : "—";
   document.getElementById("capital").textContent = "$" + fmt(s.capital);
   const pnl = document.getElementById("pnl");
@@ -217,8 +211,24 @@ async function actualizar() {
   document.getElementById("ops").textContent = s.operaciones + " (" + s.ganadoras + " ✓)";
   document.getElementById("winrate").textContent = s.operaciones ? s.win_rate + "%" : "—";
 
-  // Pensamiento
-  document.getElementById("pensamiento").textContent = s.pensamiento;
+  // Veredictos
+  const tec = (s.tecnico && s.tecnico.veredicto) || "—";
+  const noti = (s.noticias && s.noticias.veredicto) || "—";
+  const vTec = document.getElementById("vTec"); vTec.textContent = tec; vTec.className = claseVer(tec);
+  const vNoti = document.getElementById("vNoti"); vNoti.textContent = noti; vNoti.className = claseVer(noti);
+
+  // Decisión final
+  const df = document.getElementById("decisionFinal");
+  df.textContent = s.decision || "—";
+  df.className = "decision-final d-" + String(s.decision || "default").replace(/\s/g, ".");
+
+  document.getElementById("pensamiento").textContent = s.error ? "⚠️ " + s.error : s.pensamiento;
+
+  // Motivos técnicos
+  const mot = document.getElementById("motivos");
+  if (s.tecnico && s.tecnico.motivos && s.tecnico.motivos.length) {
+    mot.innerHTML = s.tecnico.motivos.map(m => `<li>• ${m}</li>`).join("");
+  }
 
   // Posición
   const pos = document.getElementById("posicion");
@@ -226,46 +236,42 @@ async function actualizar() {
     const p = s.posicion;
     const cambio = s.precio ? ((s.precio - p.precio_entrada) / p.precio_entrada * 100) : 0;
     const cls = cambio >= 0 ? "verde" : "rojo";
-    pos.innerHTML = `
-      Entrada: <b>$${fmt(p.precio_entrada)}</b> · Cantidad: <b>${fmt(p.cantidad, 6)}</b><br>
-      Valor actual: <b>$${fmt(s.valor_posicion)}</b> ·
-      Variación: <b class="${cls}">${cambio >= 0 ? "+" : ""}${fmt(cambio)}%</b>`;
+    pos.innerHTML = `Entrada: <b>$${fmt(p.precio_entrada)}</b> · Cantidad: <b>${fmt(p.cantidad, 6)}</b><br>
+      Valor: <b>$${fmt(s.valor_posicion)}</b> · Variación: <b class="${cls}">${cambio >= 0 ? "+" : ""}${fmt(cambio)}%</b>`;
     pos.style.color = "var(--txt)";
-  } else {
-    pos.textContent = "Ninguna posición abierta.";
-    pos.style.color = "var(--muted)";
-  }
+  } else { pos.textContent = "Ninguna posición abierta."; pos.style.color = "var(--muted)"; }
 
   // Indicadores
   const ind = s.indicadores || {};
   document.getElementById("emaR").textContent = ind.ema_rapida ? "$" + fmt(ind.ema_rapida) : "—";
   document.getElementById("emaL").textContent = ind.ema_lenta ? "$" + fmt(ind.ema_lenta) : "—";
   const rsiEl = document.getElementById("rsi");
-  if (ind.rsi != null) {
-    rsiEl.textContent = ind.rsi;
-    rsiEl.className = ind.rsi > 70 ? "rojo" : ind.rsi < 30 ? "verde" : "";
-  } else rsiEl.textContent = "—";
+  if (ind.rsi != null) { rsiEl.textContent = ind.rsi; rsiEl.className = ind.rsi > 70 ? "rojo" : ind.rsi < 30 ? "verde" : ""; }
+  else rsiEl.textContent = "—";
+  const macdEl = document.getElementById("macd");
+  if (ind.macd_hist != null) { macdEl.textContent = ind.macd_hist; macdEl.className = ind.macd_hist >= 0 ? "verde" : "rojo"; }
+  else macdEl.textContent = "—";
+
+  // Titulares
+  document.getElementById("notiResumen").textContent = s.noticias && s.noticias.resumen ? "— " + s.noticias.resumen : "";
+  const tit = document.getElementById("titulares");
+  if (s.noticias && s.noticias.titulares && s.noticias.titulares.length) {
+    tit.innerHTML = s.noticias.titulares.map(t =>
+      `<div class="titular t-${t.sent}">${t.titulo}</div>`).join("");
+  }
 
   // Log
   const log = document.getElementById("log");
   if (s.log && s.log.length) {
-    log.innerHTML = s.log.map(l =>
-      `<div class="log-item log-${l.tipo}"><span class="hora">${l.hora}</span>${l.texto}</div>`
-    ).join("");
+    log.innerHTML = s.log.map(l => `<div class="log-item log-${l.tipo}"><span class="hora">${l.hora}</span>${l.texto}</div>`).join("");
   }
 
-  // Estado / botones
   const dot = document.getElementById("dot");
   dot.className = "estado-dot " + (s.encendido ? "on" : "off");
-  document.getElementById("estadoTxt").textContent =
-    s.encendido ? "Encendido · " + s.fase : "Apagado";
+  document.getElementById("estadoTxt").textContent = s.encendido ? "Encendido · " + s.fase : "Apagado";
   document.getElementById("btnOn").disabled = s.encendido;
   document.getElementById("btnOff").disabled = !s.encendido;
   document.getElementById("btnPanico").disabled = !s.encendido;
-
-  if (s.error) {
-    document.getElementById("pensamiento").textContent = "⚠️ " + s.error;
-  }
 }
 
 setInterval(actualizar, 1000);
