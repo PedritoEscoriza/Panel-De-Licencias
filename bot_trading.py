@@ -44,6 +44,8 @@ INTERVALO   = int(os.getenv("BOT_INTERVALO", "8"))       # segundos entre análi
 CAPITAL_INI = float(os.getenv("BOT_CAPITAL", "1000"))
 RIESGO_PCT  = float(os.getenv("BOT_RIESGO_PCT", "20"))
 NOTICIAS_CADA = int(os.getenv("BOT_NOTICIAS_CADA", "300"))
+# En modo equilibrado, las noticias solo frenan si son MUY negativas (algo fuerte)
+NOTICIA_FUERTE = int(os.getenv("BOT_NOTICIA_FUERTE", "-40"))  # ánimo de -100 a 100
 
 EMA_RAPIDA  = int(os.getenv("BOT_EMA_RAPIDA", "9"))
 EMA_LENTA   = int(os.getenv("BOT_EMA_LENTA", "21"))
@@ -658,14 +660,16 @@ class BotTrading:
         with self.lock:
             if self.noticias_manual.get("activo"):
                 veredicto_noticias = self.noticias_manual["veredicto"]
+                animo_noticias = self.noticias_manual.get("animo", 0)
                 self.noticias_fuente = "manual"
             else:
                 veredicto_noticias = self.noticias["veredicto"]
+                animo_noticias = self.noticias.get("animo", 0)
                 self.noticias_fuente = "auto"
 
         with self.lock:
             self.fase = "OPERANDO"
-        self.decidir(precio, tecnico["veredicto"], veredicto_noticias)
+        self.decidir(precio, tecnico["veredicto"], veredicto_noticias, animo_noticias)
 
     def analizar_tecnico(self, cierres):
         cfg = self.cfg
@@ -703,9 +707,9 @@ class BotTrading:
         veredicto = "ALCISTA" if puntos >= 2 else "BAJISTA" if puntos <= -1 else "NEUTRAL"
         return {"veredicto": veredicto, "motivos": motivos, "puntos": puntos}
 
-    def decidir(self, precio, tec, noti):
+    def decidir(self, precio, tec, noti, noti_animo=0):
         if self.posicion:
-            self.gestionar_posicion(precio, tec, noti)
+            self.gestionar_posicion(precio, tec, noti, noti_animo)
             return
 
         # Sin señal alcista en el gráfico → nunca compramos
@@ -722,11 +726,12 @@ class BotTrading:
             else:
                 self._no_operar(f"modo estricto: el gráfico es alcista pero falta confirmación "
                                 f"de las noticias ({noti.lower()})")
-        else:  # equilibrado
-            if noti == "BAJISTA":
-                self._no_operar("el gráfico es alcista PERO las noticias están bajistas → mejor no arriesgar")
+        else:  # equilibrado: manda el gráfico; las noticias solo frenan si son FUERTES
+            if noti == "BAJISTA" and noti_animo <= NOTICIA_FUERTE:
+                self._no_operar(f"el gráfico es alcista PERO hay noticias muy negativas "
+                                f"(ánimo {noti_animo}) → mejor no arriesgar")
             else:
-                self.abrir_posicion(precio, "el gráfico da señal alcista y las noticias no lo contradicen")
+                self.abrir_posicion(precio, "el gráfico da señal alcista (sin noticias graves en contra)")
 
     def _no_operar(self, razon):
         with self.lock:
@@ -770,7 +775,7 @@ class BotTrading:
             f"🟩 COMPRA {cantidad:.6f} {self.symbol.split('/')[0]} a ${precio:,.2f} "
             f"(-${comision:.2f} comisión) — {razon}.")
 
-    def gestionar_posicion(self, precio, tec, noti):
+    def gestionar_posicion(self, precio, tec, noti, noti_animo=0):
         tp, sl = self.cfg["tp"], self.cfg["sl"]
         entrada = self.posicion["precio_entrada"]
         cambio_pct = (precio - entrada) / entrada * 100
@@ -784,8 +789,10 @@ class BotTrading:
             self.cerrar_posicion(f"tocó el stop loss ({cambio_pct:.2f}%)", precio)
         elif tec == "BAJISTA":
             self.cerrar_posicion(f"el gráfico se dio vuelta a BAJISTA (resultado {cambio_pct:+.2f}%)", precio)
-        elif noti == "BAJISTA" and self.filtro != "solo_tecnico":
-            self.cerrar_posicion(f"las noticias se pusieron BAJISTAS (resultado {cambio_pct:+.2f}%)", precio)
+        elif self.filtro == "estricto" and noti == "BAJISTA":
+            self.cerrar_posicion(f"las noticias se pusieron bajistas (resultado {cambio_pct:+.2f}%)", precio)
+        elif self.filtro == "equilibrado" and noti == "BAJISTA" and noti_animo <= NOTICIA_FUERTE:
+            self.cerrar_posicion(f"salieron noticias muy negativas (resultado {cambio_pct:+.2f}%)", precio)
 
     def cerrar_posicion(self, razon, precio=None):
         if not self.posicion:
