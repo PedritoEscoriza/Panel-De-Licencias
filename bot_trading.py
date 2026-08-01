@@ -438,6 +438,23 @@ def buscar_mejor_estrategia(cierres):
     return resultados
 
 
+# ── Config de conexión a Binance (se guarda para no reescribirla cada vez) ───
+CONFIG_BINANCE = os.path.join(os.path.dirname(__file__), "binance_config.json")
+
+
+def cargar_config_binance():
+    try:
+        with open(CONFIG_BINANCE) as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+def guardar_config_binance(datos):
+    with open(CONFIG_BINANCE, "w") as f:
+        json.dump(datos, f)
+
+
 # ── El bot ──────────────────────────────────────────────────────────────────
 class BotTrading:
     def __init__(self):
@@ -445,6 +462,11 @@ class BotTrading:
         self.hilo = None
         self.encendido = False
         self.exchange = None
+        # Conexión a Binance (modo y keys), guardada para no reescribirla
+        _cfgb = cargar_config_binance()
+        self._modo = _cfgb.get("modo", MODO)
+        self.api_key = _cfgb.get("api_key", "")
+        self.api_secret = _cfgb.get("api_secret", "")
         # El resumen manual persiste aunque prendas/apagues el bot
         self.noticias_manual = {"activo": False, "texto": "", "veredicto": "—",
                                 "animo": 0, "bias": "auto", "hora": ""}
@@ -457,7 +479,7 @@ class BotTrading:
 
     def reset_estado(self):
         self.fase = "APAGADO"
-        self.modo = MODO
+        self.modo = self._modo
         self.symbol = SYMBOL
         self.precio = None
         self.capital = CAPITAL_INI
@@ -512,12 +534,12 @@ class BotTrading:
 
     def crear_exchange(self):
         opciones = {"enableRateLimit": True, "options": {"defaultType": "spot"}}
-        if self.modo == "testnet":
-            opciones["apiKey"] = os.getenv("BINANCE_TESTNET_API_KEY", "")
-            opciones["secret"] = os.getenv("BINANCE_TESTNET_API_SECRET", "")
-        elif self.modo == "real":
-            opciones["apiKey"] = os.getenv("BINANCE_API_KEY", "")
-            opciones["secret"] = os.getenv("BINANCE_API_SECRET", "")
+        if self.modo in ("testnet", "real"):
+            # Preferimos las keys cargadas desde el panel; si no, las del .env
+            env_k = "BINANCE_TESTNET_API_KEY" if self.modo == "testnet" else "BINANCE_API_KEY"
+            env_s = "BINANCE_TESTNET_API_SECRET" if self.modo == "testnet" else "BINANCE_API_SECRET"
+            opciones["apiKey"] = self.api_key or os.getenv(env_k, "")
+            opciones["secret"] = self.api_secret or os.getenv(env_s, "")
         ex = ccxt.binance(opciones)
         if self.modo == "testnet":
             ex.set_sandbox_mode(True)
@@ -870,6 +892,40 @@ class Handler(BaseHTTPRequestHandler):
                 bot.noticias_fuente = "auto"
             bot.registrar("info", "📥 Información borrada → vuelve a noticias automáticas.")
             self._json({"ok": True, "mensaje": "Resumen manual borrado"})
+        elif self.path == "/conectar":
+            body = self._body()
+            modo = (body.get("modo", "simulado") or "simulado").lower()
+            api_key = (body.get("api_key", "") or "").strip()
+            api_secret = (body.get("api_secret", "") or "").strip()
+            if modo not in ("simulado", "testnet", "real"):
+                self._json({"ok": False, "mensaje": "Modo inválido"}); return
+            if modo in ("testnet", "real") and not (api_key and api_secret):
+                self._json({"ok": False, "mensaje": "Para testnet/real tenés que poner la API Key y el Secret."}); return
+            if bot.encendido:
+                self._json({"ok": False, "mensaje": "Apagá el bot antes de cambiar la conexión."}); return
+
+            if modo == "simulado":
+                self._aplicar_conexion("simulado", "", "")
+                bot.registrar("info", "🔌 Modo cambiado a SIMULADO (demo, sin keys).")
+                self._json({"ok": True, "mensaje": "Modo simulado (demo). Ya podés encender el bot."})
+                return
+            # testnet/real: probamos la conexión ANTES de aplicar, para no quedar trabados
+            try:
+                opts = {"enableRateLimit": True, "apiKey": api_key, "secret": api_secret,
+                        "options": {"defaultType": "spot"}}
+                prueba = ccxt.binance(opts)
+                if modo == "testnet":
+                    prueba.set_sandbox_mode(True)
+                usdt = prueba.fetch_balance().get("USDT", {}).get("free", 0)
+            except Exception as e:
+                self._json({"ok": False, "mensaje": f"No pude conectar: {e}. "
+                            f"Revisá las keys o si Binance está disponible en tu país. "
+                            f"(Seguís en el modo anterior, tranquilo.)"})
+                return
+            self._aplicar_conexion(modo, api_key, api_secret)
+            bot.registrar("info", f"🔌 Conectado a Binance {modo.upper()} — balance {usdt:.2f} USDT.")
+            self._json({"ok": True, "mensaje": f"¡Conectado a {modo}! Balance: {usdt:.2f} USDT. "
+                        f"Ya podés encender el bot."})
         elif self.path == "/backtest":
             try:
                 velas, fuente = bajar_velas(SYMBOL, TIMEFRAME, 1000)
@@ -890,6 +946,14 @@ class Handler(BaseHTTPRequestHandler):
                 self._json({"ok": False, "mensaje": f"No se pudo correr el backtest: {e}"})
         else:
             self.send_response(404); self.end_headers()
+
+    def _aplicar_conexion(self, modo, api_key, api_secret):
+        with bot.lock:
+            bot._modo = modo
+            bot.api_key = api_key
+            bot.api_secret = api_secret
+            bot.modo = modo
+        guardar_config_binance({"modo": modo, "api_key": api_key, "api_secret": api_secret})
 
     def _body(self):
         length = int(self.headers.get("Content-Length", 0))

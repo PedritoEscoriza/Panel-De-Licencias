@@ -6,3 +6,4 @@ venv/
 
 # Credenciales y entorno (NO subir claves a git)
 .env
+binance_config.json
