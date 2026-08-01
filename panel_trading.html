@@ -166,6 +166,7 @@
     </div>
     <div id="lecturaTxt" style="margin-top:8px;font-size:14px;color:var(--muted);line-height:1.6;"></div>
     <div id="nivelesTxt" style="margin-top:6px;font-size:13px;display:flex;gap:16px;flex-wrap:wrap;"></div>
+    <div id="actividadTxt" style="margin-top:8px;font-size:12px;color:var(--muted);"></div>
   </div>
 
   <!-- Decisión -->
@@ -498,6 +499,9 @@ async function actualizar() {
     document.getElementById("lecturaTxt").textContent = "";
     document.getElementById("nivelesTxt").innerHTML = "";
   }
+  const act = document.getElementById("actividadTxt");
+  if (act) act.textContent = s.ciclos ?
+    `🔬 Analizó ${s.ciclos} veces · vio señal de compra ${s.ciclos_con_senal} ${s.ciclos_con_senal === 1 ? "vez" : "veces"} · operó ${s.operaciones} ${s.operaciones === 1 ? "vez" : "veces"}` : "";
 
   const tec = (s.tecnico && s.tecnico.veredicto) || "—";
   // Noticias efectivas: si hay resumen del profe cargado, ese manda

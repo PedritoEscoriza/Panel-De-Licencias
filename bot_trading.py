@@ -494,6 +494,8 @@ class BotTrading:
         self.historial = []            # últimos cierres, para el gráfico
         self.fuente_datos = "—"        # de qué exchange salieron los datos
         self.lectura = {}              # lectura del gráfico en palabras
+        self.ciclos = 0                # cuántas veces analizó
+        self.ciclos_con_senal = 0      # cuántas veces vio señal técnica alcista
         self.tecnico = {"veredicto": "—", "motivos": []}
         self.noticias = {"veredicto": "—", "animo": 0, "confianza": 0,
                          "titulares": [], "resumen": "", "top_alcista": None, "top_bajista": None}
@@ -528,6 +530,7 @@ class BotTrading:
                 "tecnico": self.tecnico, "noticias": self.noticias,
                 "noticias_manual": self.noticias_manual, "noticias_fuente": self.noticias_fuente,
                 "cfg": self.cfg, "backtest": self.backtest, "filtro": self.filtro,
+                "ciclos": self.ciclos, "ciclos_con_senal": self.ciclos_con_senal,
                 "decision": self.decision, "pensamiento": self.pensamiento,
                 "log": self.log, "error": self.error,
                 "config": {"timeframe": TIMEFRAME, "intervalo": INTERVALO,
@@ -647,6 +650,9 @@ class BotTrading:
         with self.lock:
             self.tecnico = tecnico
             self.lectura = lectura_grafico(velas, self.indicadores, tecnico)
+            self.ciclos += 1
+            if tecnico.get("veredicto") == "ALCISTA":
+                self.ciclos_con_senal += 1
 
         # Noticias efectivas: si cargaste un resumen manual (del profe), ese manda
         with self.lock:
