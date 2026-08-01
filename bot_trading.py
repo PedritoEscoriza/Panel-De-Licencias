@@ -514,6 +514,7 @@ class BotTrading:
                 valor_pos = round(self.posicion["cantidad"] * self.precio, 2)
             return {
                 "encendido": self.encendido, "fase": self.fase, "modo": self.modo,
+                "tiene_keys": bool(self.api_key),
                 "symbol": self.symbol, "precio": self.precio,
                 "capital": round(self.capital, 2), "posicion": self.posicion,
                 "valor_posicion": valor_pos, "pnl": round(self.pnl, 2),
@@ -897,6 +898,10 @@ class Handler(BaseHTTPRequestHandler):
             modo = (body.get("modo", "simulado") or "simulado").lower()
             api_key = (body.get("api_key", "") or "").strip()
             api_secret = (body.get("api_secret", "") or "").strip()
+            # Si dejó las casillas vacías pero ya había keys guardadas, reusarlas
+            if modo == bot._modo:
+                api_key = api_key or bot.api_key
+                api_secret = api_secret or bot.api_secret
             if modo not in ("simulado", "testnet", "real"):
                 self._json({"ok": False, "mensaje": "Modo inválido"}); return
             if modo in ("testnet", "real") and not (api_key and api_secret):

@@ -432,7 +432,19 @@ async function actualizar() {
   document.getElementById("warnReal").style.display = s.modo === "real" ? "block" : "none";
   document.getElementById("symbol").textContent = s.symbol;
   const conEstado = document.getElementById("conEstado");
-  if (conEstado) conEstado.textContent = "— ahora en: " + s.modo + (s.encendido ? " (bot encendido: apagalo para cambiar)" : "");
+  if (conEstado) conEstado.textContent = "— ahora en: " + s.modo +
+    (s.tiene_keys ? " · ✅ keys guardadas" : "") +
+    (s.encendido ? " (apagá el bot para cambiar)" : "");
+  // Sincronizar el menú con el modo guardado (una sola vez, al abrir)
+  if (!window._modoSync) {
+    const sel = document.getElementById("conModo");
+    if (sel) { sel.value = s.modo; cambioModo(); }
+    if (s.tiene_keys) {
+      document.getElementById("apiKey").placeholder = "API Key (ya guardada — dejá vacío para no cambiarla)";
+      document.getElementById("apiSecret").placeholder = "Secret (ya guardado — dejá vacío para no cambiarlo)";
+    }
+    window._modoSync = true;
+  }
   document.getElementById("chartSymbol").textContent = s.symbol + " · " + (s.config ? s.config.timeframe : "") +
     (s.fuente_datos && s.fuente_datos !== "—" ? " · datos: " + s.fuente_datos : "");
 
