@@ -40,7 +40,7 @@ load_dotenv()
 MODO        = os.getenv("BOT_MODO", "simulado").lower()   # simulado | testnet | real
 SYMBOL      = os.getenv("BOT_SYMBOL", "BTC/USDT")
 TIMEFRAME   = os.getenv("BOT_TIMEFRAME", "5m")
-INTERVALO   = int(os.getenv("BOT_INTERVALO", "15"))
+INTERVALO   = int(os.getenv("BOT_INTERVALO", "8"))       # segundos entre análisis
 CAPITAL_INI = float(os.getenv("BOT_CAPITAL", "1000"))
 RIESGO_PCT  = float(os.getenv("BOT_RIESGO_PCT", "20"))
 NOTICIAS_CADA = int(os.getenv("BOT_NOTICIAS_CADA", "300"))
@@ -178,6 +178,7 @@ def macd(valores, rapida=12, lenta=26, senal=9):
 # usamos el primero que responda. Las órdenes reales siguen yendo a Binance.
 EXCHANGES_DATOS = ["binance", "kucoin", "kraken", "okx", "coinbase"]
 _cache_ex_datos = {}
+_ultimo_ok = None   # último exchange que respondió (se prueba primero para ir rápido)
 
 
 def _exchange_datos(ex_id):
@@ -187,12 +188,16 @@ def _exchange_datos(ex_id):
 
 
 def bajar_velas(symbol, timeframe, limit):
-    """Baja velas probando varios exchanges. Devuelve (velas, nombre_exchange)."""
+    """Baja velas probando varios exchanges. Devuelve (velas, nombre_exchange).
+    Recuerda cuál funcionó y lo prueba primero para no demorar en cada vuelta."""
+    global _ultimo_ok
+    orden = ([_ultimo_ok] if _ultimo_ok else []) + [e for e in EXCHANGES_DATOS if e != _ultimo_ok]
     ultimo_error = None
-    for ex_id in EXCHANGES_DATOS:
+    for ex_id in orden:
         try:
             velas = _exchange_datos(ex_id).fetch_ohlcv(symbol, timeframe=timeframe, limit=limit)
             if velas:
+                _ultimo_ok = ex_id
                 return velas, ex_id
         except Exception as e:
             ultimo_error = e
@@ -381,6 +386,47 @@ def simular_estrategia(cierres, cfg, comision=COMISION, riesgo=20.0):
             "max_dd": round(max_dd, 2)}
 
 
+def lectura_grafico(velas, indic, tecnico):
+    """Lee el gráfico en palabras: tendencia, soporte/resistencia, momentum y señal."""
+    cierres = [v[4] for v in velas]
+    highs = [v[2] for v in velas]
+    lows = [v[3] for v in velas]
+    precio = cierres[-1]
+    vent = min(40, len(velas))
+    resistencia = max(highs[-vent:])
+    soporte = min(lows[-vent:])
+    dist_res = (resistencia - precio) / precio * 100 if precio else 0
+    dist_sop = (precio - soporte) / precio * 100 if precio else 0
+
+    er, el = indic.get("ema_rapida"), indic.get("ema_lenta")
+    rsi_v, hist = indic.get("rsi"), indic.get("macd_hist")
+    tendencia = "—"
+    if er and el:
+        tendencia = "alcista" if er > el else "bajista"
+
+    puntos = tecnico.get("puntos", 0)
+    if puntos >= 2:
+        senal = "🟢 Señal alcista detectada en el gráfico"
+    elif puntos == 1:
+        senal = "🔎 Señal alcista formándose (falta confirmación)"
+    elif puntos <= -1:
+        senal = "🔴 Gráfico bajista — sin señal de compra"
+    else:
+        senal = "⚪ Buscando señal... sin nada claro por ahora"
+
+    frases = [f"Precio ${precio:,.0f}, tendencia {tendencia}."]
+    frases.append(f"Resistencia en ${resistencia:,.0f} (a +{dist_res:.2f}%) y "
+                  f"soporte en ${soporte:,.0f} (a -{dist_sop:.2f}%).")
+    if rsi_v is not None:
+        estado = "sobrecomprado" if rsi_v > 70 else "sobrevendido" if rsi_v < 30 else "neutral"
+        frases.append(f"RSI {rsi_v} ({estado}).")
+    if hist is not None:
+        frases.append("MACD con impulso " + ("alcista." if hist > 0 else "bajista."))
+    return {"tendencia": tendencia, "soporte": round(soporte, 2), "resistencia": round(resistencia, 2),
+            "dist_res": round(dist_res, 2), "dist_sop": round(dist_sop, 2),
+            "senal": senal, "texto": " ".join(frases)}
+
+
 def buscar_mejor_estrategia(cierres):
     """Prueba todas las estrategias del grid y las ordena por resultado."""
     resultados = []
@@ -423,6 +469,7 @@ class BotTrading:
         self.indicadores = {}
         self.historial = []            # últimos cierres, para el gráfico
         self.fuente_datos = "—"        # de qué exchange salieron los datos
+        self.lectura = {}              # lectura del gráfico en palabras
         self.tecnico = {"veredicto": "—", "motivos": []}
         self.noticias = {"veredicto": "—", "animo": 0, "confianza": 0,
                          "titulares": [], "resumen": "", "top_alcista": None, "top_bajista": None}
@@ -452,7 +499,7 @@ class BotTrading:
                 "ganadoras": self.ganadoras,
                 "win_rate": round(self.ganadoras / self.operaciones * 100, 1) if self.operaciones else 0,
                 "indicadores": self.indicadores, "historial": self.historial,
-                "fuente_datos": self.fuente_datos,
+                "fuente_datos": self.fuente_datos, "lectura": self.lectura,
                 "tecnico": self.tecnico, "noticias": self.noticias,
                 "noticias_manual": self.noticias_manual, "noticias_fuente": self.noticias_fuente,
                 "cfg": self.cfg, "backtest": self.backtest,
@@ -574,6 +621,7 @@ class BotTrading:
         tecnico = self.analizar_tecnico(cierres)
         with self.lock:
             self.tecnico = tecnico
+            self.lectura = lectura_grafico(velas, self.indicadores, tecnico)
 
         # Noticias efectivas: si cargaste un resumen manual (del profe), ese manda
         with self.lock:

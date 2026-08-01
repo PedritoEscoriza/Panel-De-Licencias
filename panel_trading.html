@@ -132,11 +132,16 @@
     <div class="card"><div class="label">% aciertos</div><div class="valor" id="winrate">—</div></div>
   </div>
 
-  <!-- Gráfico de precio -->
+  <!-- Gráfico de precio + lectura en vivo -->
   <div class="box">
     <h3>📉 Precio <span id="chartSymbol" style="text-transform:none;font-weight:400;"></span></h3>
     <canvas id="chart"></canvas>
     <div class="chart-info"><span id="chartMin">—</span><span id="chartMax">—</span></div>
+    <div id="senalBox" style="margin-top:12px;padding:12px;border-radius:8px;background:var(--panel2);border:1px solid var(--border);text-align:center;font-size:17px;font-weight:700;">
+      📡 Encendé el bot para analizar el gráfico en vivo
+    </div>
+    <div id="lecturaTxt" style="margin-top:8px;font-size:14px;color:var(--muted);line-height:1.6;"></div>
+    <div id="nivelesTxt" style="margin-top:6px;font-size:13px;display:flex;gap:16px;flex-wrap:wrap;"></div>
   </div>
 
   <!-- Decisión -->
@@ -332,7 +337,7 @@ async function borrarProfe() {
 }
 
 // ── Gráfico de precio (canvas, sin librerías) ──
-function dibujarChart(datos) {
+function dibujarChart(datos, lectura) {
   const c = document.getElementById("chart");
   const dpr = window.devicePixelRatio || 1;
   const w = c.clientWidth, h = 160;
@@ -340,9 +345,24 @@ function dibujarChart(datos) {
   const ctx = c.getContext("2d"); ctx.scale(dpr, dpr);
   ctx.clearRect(0, 0, w, h);
   if (!datos || datos.length < 2) return;
-  const min = Math.min(...datos), max = Math.max(...datos), rango = (max - min) || 1;
+  // Incluir soporte/resistencia en el rango del gráfico para que se vean
+  let vals = datos.slice();
+  if (lectura && lectura.soporte) vals.push(lectura.soporte);
+  if (lectura && lectura.resistencia) vals.push(lectura.resistencia);
+  const min = Math.min(...vals), max = Math.max(...vals), rango = (max - min) || 1;
   const px = i => (i / (datos.length - 1)) * (w - 8) + 4;
   const py = v => h - 8 - ((v - min) / rango) * (h - 16);
+  // Líneas de soporte (verde) y resistencia (roja), punteadas
+  ctx.setLineDash([5, 4]); ctx.lineWidth = 1;
+  if (lectura && lectura.resistencia) {
+    ctx.beginPath(); ctx.moveTo(4, py(lectura.resistencia)); ctx.lineTo(w - 4, py(lectura.resistencia));
+    ctx.strokeStyle = "rgba(234,57,67,.6)"; ctx.stroke();
+  }
+  if (lectura && lectura.soporte) {
+    ctx.beginPath(); ctx.moveTo(4, py(lectura.soporte)); ctx.lineTo(w - 4, py(lectura.soporte));
+    ctx.strokeStyle = "rgba(22,199,132,.6)"; ctx.stroke();
+  }
+  ctx.setLineDash([]);
   const sube = datos[datos.length - 1] >= datos[0];
   const color = sube ? "#16c784" : "#ea3943";
   // área
@@ -380,7 +400,26 @@ async function actualizar() {
   document.getElementById("ops").textContent = s.operaciones + " (" + s.ganadoras + " ✓)";
   document.getElementById("winrate").textContent = s.operaciones ? s.win_rate + "%" : "—";
 
-  dibujarChart(s.historial);
+  dibujarChart(s.historial, s.lectura);
+
+  // Lectura del gráfico en vivo
+  const lec = s.lectura || {};
+  const senalBox = document.getElementById("senalBox");
+  if (lec.senal) {
+    senalBox.textContent = lec.senal;
+    const c = lec.senal.indexOf("🟢") >= 0 ? "var(--verde)" : lec.senal.indexOf("🔴") >= 0 ? "var(--rojo)"
+            : lec.senal.indexOf("🔎") >= 0 ? "var(--amarillo)" : "var(--muted)";
+    senalBox.style.color = c; senalBox.style.borderColor = c;
+    document.getElementById("lecturaTxt").textContent = lec.texto || "";
+    document.getElementById("nivelesTxt").innerHTML = (lec.resistencia && lec.soporte) ?
+      `<span style="color:var(--rojo)">▲ Resistencia: $${fmt(lec.resistencia)} (+${lec.dist_res}%)</span>
+       <span style="color:var(--verde)">▼ Soporte: $${fmt(lec.soporte)} (-${lec.dist_sop}%)</span>` : "";
+  } else if (!s.encendido) {
+    senalBox.textContent = "📡 Encendé el bot para analizar el gráfico en vivo";
+    senalBox.style.color = "var(--muted)"; senalBox.style.borderColor = "var(--border)";
+    document.getElementById("lecturaTxt").textContent = "";
+    document.getElementById("nivelesTxt").innerHTML = "";
+  }
 
   const tec = (s.tecnico && s.tecnico.veredicto) || "—";
   // Noticias efectivas: si hay resumen del profe cargado, ese manda
