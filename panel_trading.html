@@ -170,7 +170,15 @@
 
   <!-- Decisión -->
   <div class="box">
-    <h3>🎯 Decisión (opera solo si coinciden)</h3>
+    <h3>🎯 Decisión</h3>
+    <div class="fila" style="margin-bottom:12px;">
+      <span style="font-size:13px;color:var(--muted);align-self:center;">Cuándo operar:</span>
+      <select id="filtroModo" onchange="cambiarFiltro()" style="background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--txt);font-size:13px;">
+        <option value="equilibrado">Equilibrado — gráfico alcista + noticias no bajistas (recomendado)</option>
+        <option value="estricto">Estricto — gráfico Y noticias alcistas (opera poco)</option>
+        <option value="solo_tecnico">Solo técnico — solo el gráfico (ignora noticias)</option>
+      </select>
+    </div>
     <div class="confluencia">
       <div class="veredicto"><div class="tit">📈 Análisis técnico</div><div class="val" id="vTec">—</div></div>
       <div class="veredicto"><div class="tit">📰 Noticias</div><div class="val" id="vNoti">—</div><div class="sub" id="vNotiSub"></div></div>
@@ -309,6 +317,15 @@ function copiarResumen() {
   document.getElementById("msgEnvio").style.color = "var(--muted)";
 }
 
+// ── Filtro de decisión ──
+async function cambiarFiltro() {
+  const filtro = document.getElementById("filtroModo").value;
+  try {
+    await fetch(API + "/filtro", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ filtro }) });
+  } catch (e) {}
+}
+
 // ── Conectar Binance ──
 function cambioModo() {
   const modo = document.getElementById("conModo").value;
@@ -439,6 +456,8 @@ async function actualizar() {
   if (!window._modoSync) {
     const sel = document.getElementById("conModo");
     if (sel) { sel.value = s.modo; cambioModo(); }
+    const selF = document.getElementById("filtroModo");
+    if (selF && s.filtro) selF.value = s.filtro;
     if (s.tiene_keys) {
       document.getElementById("apiKey").placeholder = "API Key (ya guardada — dejá vacío para no cambiarla)";
       document.getElementById("apiSecret").placeholder = "Secret (ya guardado — dejá vacío para no cambiarlo)";

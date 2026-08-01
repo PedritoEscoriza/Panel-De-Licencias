@@ -467,6 +467,8 @@ class BotTrading:
         self._modo = _cfgb.get("modo", MODO)
         self.api_key = _cfgb.get("api_key", "")
         self.api_secret = _cfgb.get("api_secret", "")
+        # Cómo combina técnico + noticias: estricto | equilibrado | solo_tecnico
+        self.filtro = _cfgb.get("filtro", "equilibrado")
         # El resumen manual persiste aunque prendas/apagues el bot
         self.noticias_manual = {"activo": False, "texto": "", "veredicto": "—",
                                 "animo": 0, "bias": "auto", "hora": ""}
@@ -525,7 +527,7 @@ class BotTrading:
                 "fuente_datos": self.fuente_datos, "lectura": self.lectura,
                 "tecnico": self.tecnico, "noticias": self.noticias,
                 "noticias_manual": self.noticias_manual, "noticias_fuente": self.noticias_fuente,
-                "cfg": self.cfg, "backtest": self.backtest,
+                "cfg": self.cfg, "backtest": self.backtest, "filtro": self.filtro,
                 "decision": self.decision, "pensamiento": self.pensamiento,
                 "log": self.log, "error": self.error,
                 "config": {"timeframe": TIMEFRAME, "intervalo": INTERVALO,
@@ -699,24 +701,31 @@ class BotTrading:
         if self.posicion:
             self.gestionar_posicion(precio, tec, noti)
             return
-        if tec == "ALCISTA" and noti == "ALCISTA":
-            self.abrir_posicion(precio,
-                "el análisis técnico Y las noticias coinciden en ALCISTA (no se contradicen)")
-        else:
-            if tec == "ALCISTA" and noti == "BAJISTA":
-                razon = "el técnico dice ALCISTA pero las noticias dicen BAJISTA → se contradicen"
-            elif tec == "BAJISTA" and noti == "ALCISTA":
-                razon = "las noticias dicen ALCISTA pero el técnico dice BAJISTA → se contradicen"
-            elif noti in ("NEUTRAL", "SIN DATOS"):
-                razon = f"las noticias no dan una señal clara ({noti.lower()})"
-            elif tec in ("NEUTRAL", "SIN DATOS"):
-                razon = f"el técnico no da una señal clara ({tec.lower()})"
+
+        # Sin señal alcista en el gráfico → nunca compramos
+        if tec != "ALCISTA":
+            self._no_operar(f"el gráfico no da señal de compra ({tec.lower()})")
+            return
+
+        # Hay señal técnica alcista: la combinamos con las noticias según el filtro
+        if self.filtro == "solo_tecnico":
+            self.abrir_posicion(precio, "el gráfico da señal alcista (modo solo técnico)")
+        elif self.filtro == "estricto":
+            if noti == "ALCISTA":
+                self.abrir_posicion(precio, "el gráfico Y las noticias coinciden en ALCISTA (modo estricto)")
             else:
-                razon = f"técnico {tec} y noticias {noti} no coinciden en ALCISTA"
-            with self.lock:
-                self.decision = "NO OPERAR"
-                self.pensamiento = (f"Me quedo QUIETO porque {razon}. "
-                                    f"Solo compro cuando técnico y noticias están de acuerdo.")
+                self._no_operar(f"modo estricto: el gráfico es alcista pero falta confirmación "
+                                f"de las noticias ({noti.lower()})")
+        else:  # equilibrado
+            if noti == "BAJISTA":
+                self._no_operar("el gráfico es alcista PERO las noticias están bajistas → mejor no arriesgar")
+            else:
+                self.abrir_posicion(precio, "el gráfico da señal alcista y las noticias no lo contradicen")
+
+    def _no_operar(self, razon):
+        with self.lock:
+            self.decision = "NO OPERAR"
+            self.pensamiento = f"Me quedo QUIETO porque {razon}."
 
     # ---- ejecución de órdenes ----
     def _orden_real(self, lado, cantidad):
@@ -767,9 +776,10 @@ class BotTrading:
             self.cerrar_posicion(f"llegó al objetivo de ganancia (+{cambio_pct:.2f}%)", precio)
         elif cambio_pct <= -sl:
             self.cerrar_posicion(f"tocó el stop loss ({cambio_pct:.2f}%)", precio)
-        elif tec == "BAJISTA" or noti == "BAJISTA":
-            quien = "el técnico" if tec == "BAJISTA" else "las noticias"
-            self.cerrar_posicion(f"{quien} se dio vuelta a BAJISTA (resultado {cambio_pct:+.2f}%)", precio)
+        elif tec == "BAJISTA":
+            self.cerrar_posicion(f"el gráfico se dio vuelta a BAJISTA (resultado {cambio_pct:+.2f}%)", precio)
+        elif noti == "BAJISTA" and self.filtro != "solo_tecnico":
+            self.cerrar_posicion(f"las noticias se pusieron BAJISTAS (resultado {cambio_pct:+.2f}%)", precio)
 
     def cerrar_posicion(self, razon, precio=None):
         if not self.posicion:
@@ -931,6 +941,17 @@ class Handler(BaseHTTPRequestHandler):
             bot.registrar("info", f"🔌 Conectado a Binance {modo.upper()} — balance {usdt:.2f} USDT.")
             self._json({"ok": True, "mensaje": f"¡Conectado a {modo}! Balance: {usdt:.2f} USDT. "
                         f"Ya podés encender el bot."})
+        elif self.path == "/filtro":
+            body = self._body()
+            filtro = (body.get("filtro", "equilibrado") or "equilibrado").lower()
+            if filtro not in ("estricto", "equilibrado", "solo_tecnico"):
+                self._json({"ok": False, "mensaje": "Filtro inválido"}); return
+            with bot.lock:
+                bot.filtro = filtro
+            cfg = cargar_config_binance(); cfg["filtro"] = filtro; guardar_config_binance(cfg)
+            nombres = {"estricto": "Estricto", "equilibrado": "Equilibrado", "solo_tecnico": "Solo técnico"}
+            bot.registrar("info", f"⚙️ Modo de decisión cambiado a: {nombres[filtro]}.")
+            self._json({"ok": True, "mensaje": f"Modo de decisión: {nombres[filtro]}."})
         elif self.path == "/backtest":
             try:
                 velas, fuente = bajar_velas(SYMBOL, TIMEFRAME, 1000)
