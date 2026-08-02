@@ -471,6 +471,8 @@ class BotTrading:
         self.api_secret = _cfgb.get("api_secret", "")
         # Cómo combina técnico + noticias: estricto | equilibrado | solo_tecnico
         self.filtro = _cfgb.get("filtro", "equilibrado")
+        # Temporalidad de las velas (1m opera más seguido, 15m más tranquilo)
+        self.timeframe = _cfgb.get("timeframe", TIMEFRAME)
         # El resumen manual persiste aunque prendas/apagues el bot
         self.noticias_manual = {"activo": False, "texto": "", "veredicto": "—",
                                 "animo": 0, "bias": "auto", "hora": ""}
@@ -537,7 +539,7 @@ class BotTrading:
                 "log": self.log, "error": self.error,
                 "config": {"timeframe": TIMEFRAME, "intervalo": INTERVALO,
                            "take_profit": TAKE_PROFIT, "stop_loss": STOP_LOSS,
-                           "comision": COMISION},
+                           "comision": COMISION, "timeframe": self.timeframe},
             }
 
     def crear_exchange(self):
@@ -632,7 +634,7 @@ class BotTrading:
         with self.lock:
             self.fase = "CARGANDO"
             self.pensamiento = "Cargando velas del mercado y titulares de noticias..."
-        velas, fuente = bajar_velas(self.symbol, TIMEFRAME, 120)
+        velas, fuente = bajar_velas(self.symbol, self.timeframe, 120)
         cierres = [v[4] for v in velas]
         precio = cierres[-1]
         with self.lock:
@@ -738,15 +740,21 @@ class BotTrading:
             self.decision = "NO OPERAR"
             self.pensamiento = f"Me quedo QUIETO porque {razon}."
 
-    # ---- ejecución de órdenes ----
-    def _orden_real(self, lado, cantidad):
-        """Manda una orden de mercado real (testnet/real). Devuelve precio de fill."""
+    # ---- ejecución de órdenes reales (testnet/real) ----
+    def _comprar_real(self, monto_usdt):
+        """Compra de mercado gastando monto_usdt. Binance compra spot por monto en
+        USDT (quoteOrderQty), no por cantidad de BTC. Devuelve (precio, cantidad)."""
+        self.exchange.options["createMarketBuyOrderRequiresPrice"] = False
+        orden = self.exchange.create_market_buy_order(self.symbol, monto_usdt)
+        precio = orden.get("average") or orden.get("price") or self.precio
+        cantidad = orden.get("filled") or (monto_usdt / precio if precio else 0)
+        return precio, cantidad
+
+    def _vender_real(self, cantidad):
         cantidad = float(self.exchange.amount_to_precision(self.symbol, cantidad))
-        if lado == "buy":
-            orden = self.exchange.create_market_buy_order(self.symbol, cantidad)
-        else:
-            orden = self.exchange.create_market_sell_order(self.symbol, cantidad)
-        return orden.get("average") or orden.get("price") or self.precio, cantidad
+        orden = self.exchange.create_market_sell_order(self.symbol, cantidad)
+        precio = orden.get("average") or orden.get("price") or self.precio
+        return precio, cantidad
 
     def abrir_posicion(self, precio, razon):
         monto = self.capital * (RIESGO_PCT / 100)
@@ -758,7 +766,7 @@ class BotTrading:
         # En testnet/real mandamos la orden de verdad
         if self.modo in ("testnet", "real"):
             try:
-                precio, cantidad = self._orden_real("buy", cantidad)
+                precio, cantidad = self._comprar_real(monto)
                 monto = cantidad * precio
             except Exception as e:
                 self.registrar("error", f"❌ No se pudo COMPRAR en {self.modo}: {e}")
@@ -802,7 +810,7 @@ class BotTrading:
         entrada = self.posicion["precio_entrada"]
         if self.modo in ("testnet", "real"):
             try:
-                precio, cantidad = self._orden_real("sell", cantidad)
+                precio, cantidad = self._vender_real(cantidad)
             except Exception as e:
                 self.registrar("error", f"❌ No se pudo VENDER en {self.modo}: {e}")
                 return
@@ -965,9 +973,19 @@ class Handler(BaseHTTPRequestHandler):
             nombres = {"estricto": "Estricto", "equilibrado": "Equilibrado", "solo_tecnico": "Solo técnico"}
             bot.registrar("info", f"⚙️ Modo de decisión cambiado a: {nombres[filtro]}.")
             self._json({"ok": True, "mensaje": f"Modo de decisión: {nombres[filtro]}."})
+        elif self.path == "/timeframe":
+            body = self._body()
+            tf = (body.get("timeframe", "5m") or "5m").lower()
+            if tf not in ("1m", "5m", "15m", "1h"):
+                self._json({"ok": False, "mensaje": "Temporalidad inválida"}); return
+            with bot.lock:
+                bot.timeframe = tf
+            cfg = cargar_config_binance(); cfg["timeframe"] = tf; guardar_config_binance(cfg)
+            bot.registrar("info", f"⏱️ Temporalidad cambiada a {tf}.")
+            self._json({"ok": True, "mensaje": f"Temporalidad: {tf}."})
         elif self.path == "/backtest":
             try:
-                velas, fuente = bajar_velas(SYMBOL, TIMEFRAME, 1000)
+                velas, fuente = bajar_velas(SYMBOL, bot.timeframe, 1000)
                 cierres = [v[4] for v in velas]
                 resultados = buscar_mejor_estrategia(cierres)
                 mejor = resultados[0]
